@@ -78,17 +78,6 @@ mvnw.cmd
 /nbdist/
 /.nb-gradle/
 
-# Environment and configuration files
-.env
-.env.local
-.env.*.local
-application-local.yml
-application-local.properties
-application-dev.yml
-application-dev.properties
-application-test.yml
-application-test.properties
-
 # Database files
 *.db
 *.sqlite
