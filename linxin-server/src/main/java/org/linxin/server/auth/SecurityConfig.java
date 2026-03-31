@@ -22,11 +22,11 @@ public class SecurityConfig {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/lxa/auth/login", "/lxa/auth/register").permitAll()
-                        .requestMatchers("/lxa/doc.html", "/lxa/swagger-ui/**", "/lxa/v3/api-docs/**").permitAll()
-                        .requestMatchers("/lxa/swagger-ui.html", "/lxa/webjars/**").permitAll()
+                        .requestMatchers("/auth/login", "/auth/register").permitAll()
+                        .requestMatchers("/doc.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                        .requestMatchers("/swagger-ui.html", "/webjars/**").permitAll()
                         .requestMatchers("/actuator/**").permitAll()
-                        .requestMatchers("/lxa/ws/**").permitAll()
+                        .requestMatchers("/ws/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)

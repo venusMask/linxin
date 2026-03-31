@@ -325,7 +325,7 @@ public class GroupServiceImpl implements IGroupService {
 
         Conversation conversation = new Conversation();
         conversation.setUserId(userId);
-        conversation.setPeerId(null);
+        conversation.setPeerId(0L);
         conversation.setPeerNickname(groupName);
         conversation.setPeerAvatar(null);
         conversation.setType(1);

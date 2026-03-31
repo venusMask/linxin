@@ -6,7 +6,7 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("groups")
+@TableName("`groups`")
 public class Group {
     @TableId(type = IdType.AUTO)
     private Long id;

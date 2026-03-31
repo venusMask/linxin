@@ -300,6 +300,7 @@ public class ChatServiceImpl implements IChatService {
         message.setSenderId(senderId);
         message.setReceiverId(0L);
         message.setGroupId(groupId);
+        message.setConversationId(0L);
         message.setMessageType(request.getMessageType());
         message.setContent(request.getContent());
         message.setExtra(request.getExtra());
