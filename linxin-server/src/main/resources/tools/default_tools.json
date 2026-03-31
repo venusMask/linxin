@@ -1,0 +1,116 @@
+{
+  "version": "1.0.0",
+  "tools": [
+    {
+      "id": "send_message",
+      "name": "sendMessage",
+      "description": "发送消息给指定用户",
+      "icon": "message",
+      "requireConfirm": true,
+      "params": [
+        {
+          "name": "receiverId",
+          "type": "string",
+          "description": "接收者用户ID",
+          "required": true
+        },
+        {
+          "name": "content",
+          "type": "string",
+          "description": "消息内容",
+          "required": true,
+          "maxLength": 2000
+        }
+      ]
+    },
+    {
+      "id": "create_group",
+      "name": "createGroup",
+      "description": "创建群聊并添加成员",
+      "icon": "group_add",
+      "requireConfirm": true,
+      "params": [
+        {
+          "name": "groupName",
+          "type": "string",
+          "description": "群名称",
+          "required": true,
+          "maxLength": 50
+        },
+        {
+          "name": "memberIds",
+          "type": "array",
+          "description": "成员ID列表",
+          "required": true,
+          "itemsType": "string"
+        }
+      ]
+    },
+    {
+      "id": "add_friend",
+      "name": "addFriend",
+      "description": "申请添加指定用户为好友",
+      "icon": "person_add",
+      "requireConfirm": true,
+      "params": [
+        {
+          "name": "userId",
+          "type": "string",
+          "description": "用户ID",
+          "required": true
+        },
+        {
+          "name": "remark",
+          "type": "string",
+          "description": "申请备注",
+          "required": false,
+          "maxLength": 100
+        }
+      ]
+    },
+    {
+      "id": "search_messages",
+      "name": "searchMessages",
+      "description": "搜索聊天记录",
+      "icon": "search",
+      "requireConfirm": false,
+      "params": [
+        {
+          "name": "keyword",
+          "type": "string",
+          "description": "搜索关键词",
+          "required": true,
+          "maxLength": 100
+        },
+        {
+          "name": "conversationId",
+          "type": "string",
+          "description": "会话ID（不填则搜索所有）",
+          "required": false
+        }
+      ]
+    },
+    {
+      "id": "set_reminder",
+      "name": "setReminder",
+      "description": "设置定时提醒",
+      "icon": "alarm",
+      "requireConfirm": true,
+      "params": [
+        {
+          "name": "time",
+          "type": "string",
+          "description": "提醒时间，ISO8601格式",
+          "required": true
+        },
+        {
+          "name": "content",
+          "type": "string",
+          "description": "提醒内容",
+          "required": true,
+          "maxLength": 500
+        }
+      ]
+    }
+  ]
+}
