@@ -1,6 +1,6 @@
 spring:
   application:
-    name: lin-xin-mgr-backend
+    name: linxin-server
   profiles:
     active: dev
   jackson:
@@ -34,10 +34,10 @@ knife4j:
 
 logging:
   level:
-    org.venus.lin.xin.mgr: debug
+    org.linxin.server: debug
 
 ai:
   base-url: https://api.openai.com
-  api-key: ${AI_API_KEY:your-api-key}
+  api-key: ${API_KEY}
   model: gpt-3.5-turbo
   temperature: 0.7
