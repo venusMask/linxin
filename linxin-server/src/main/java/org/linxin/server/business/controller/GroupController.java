@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import org.linxin.server.business.model.request.AddGroupMembersRequest;
 import org.linxin.server.business.model.request.CreateGroupRequest;
+import org.linxin.server.business.model.request.UpdateAnnouncementRequest;
 import org.linxin.server.business.service.IGroupService;
 import org.linxin.server.business.vo.GroupMemberVO;
 import org.linxin.server.business.vo.GroupVO;
@@ -24,7 +25,7 @@ public class GroupController {
     @PostMapping("/create")
     @Operation(summary = "创建群组")
     public Result<GroupVO> createGroup(
-            @RequestHeader("X-User-Id") Long userId,
+            @RequestAttribute("userId") Long userId,
             @RequestBody CreateGroupRequest request) {
         GroupVO group = groupService.createGroup(userId, request);
         return Result.success(group);
@@ -47,7 +48,7 @@ public class GroupController {
     @PostMapping("/{groupId}/members/add")
     @Operation(summary = "添加群成员")
     public Result<GroupVO> addMembers(
-            @RequestHeader("X-User-Id") Long userId,
+            @RequestAttribute("userId") Long userId,
             @PathVariable Long groupId,
             @RequestBody AddGroupMembersRequest request) {
         GroupVO group = groupService.addMembers(groupId, userId, request);
@@ -57,7 +58,7 @@ public class GroupController {
     @DeleteMapping("/{groupId}/members/{memberId}")
     @Operation(summary = "移除群成员")
     public Result<String> removeMember(
-            @RequestHeader("X-User-Id") Long userId,
+            @RequestAttribute("userId") Long userId,
             @PathVariable Long groupId,
             @PathVariable Long memberId) {
         groupService.removeMember(groupId, memberId, userId);
@@ -67,7 +68,7 @@ public class GroupController {
     @PostMapping("/{groupId}/leave")
     @Operation(summary = "退出群组")
     public Result<String> leaveGroup(
-            @RequestHeader("X-User-Id") Long userId,
+            @RequestAttribute("userId") Long userId,
             @PathVariable Long groupId) {
         groupService.leaveGroup(groupId, userId);
         return Result.success("已退出群组");
@@ -76,7 +77,7 @@ public class GroupController {
     @DeleteMapping("/{groupId}")
     @Operation(summary = "解散群组")
     public Result<String> dissolveGroup(
-            @RequestHeader("X-User-Id") Long userId,
+            @RequestAttribute("userId") Long userId,
             @PathVariable Long groupId) {
         groupService.dissolveGroup(groupId, userId);
         return Result.success("群组已解散");
@@ -85,16 +86,16 @@ public class GroupController {
     @PutMapping("/{groupId}/announcement")
     @Operation(summary = "更新群公告")
     public Result<String> updateAnnouncement(
-            @RequestHeader("X-User-Id") Long userId,
+            @RequestAttribute("userId") Long userId,
             @PathVariable Long groupId,
-            @RequestBody String announcement) {
-        groupService.updateGroupAnnouncement(groupId, userId, announcement);
+            @RequestBody UpdateAnnouncementRequest request) {
+        groupService.updateGroupAnnouncement(groupId, userId, request.getAnnouncement());
         return Result.success("群公告已更新");
     }
 
     @GetMapping("/my")
     @Operation(summary = "获取我的群组列表")
-    public Result<List<GroupVO>> getMyGroups(@RequestHeader("X-User-Id") Long userId) {
+    public Result<List<GroupVO>> getMyGroups(@RequestAttribute("userId") Long userId) {
         List<GroupVO> groups = groupService.getUserGroups(userId);
         return Result.success(groups);
     }

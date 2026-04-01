@@ -39,7 +39,7 @@ public class FriendController {
     @PostMapping("/apply")
     @Operation(summary = "发送好友申请")
     public Result<String> applyAddFriend(
-            @RequestHeader("X-User-Id") Long userId,
+            @RequestAttribute("userId") Long userId,
             @Valid @RequestBody FriendApplyRequest request) {
         friendService.applyAddFriend(userId, request);
         return Result.success("申请已发送");
@@ -47,14 +47,14 @@ public class FriendController {
 
     @GetMapping("/apply/received")
     @Operation(summary = "获取收到的好友申请列表")
-    public Result<List<FriendApplyVO>> getReceivedApplyList(@RequestHeader("X-User-Id") Long userId) {
+    public Result<List<FriendApplyVO>> getReceivedApplyList(@RequestAttribute("userId") Long userId) {
         List<FriendApplyVO> applies = friendService.getReceivedApplyList(userId);
         return Result.success(applies);
     }
 
     @GetMapping("/apply/sent")
     @Operation(summary = "获取发出的好友申请列表")
-    public Result<List<FriendApplyVO>> getSentApplyList(@RequestHeader("X-User-Id") Long userId) {
+    public Result<List<FriendApplyVO>> getSentApplyList(@RequestAttribute("userId") Long userId) {
         List<FriendApplyVO> applies = friendService.getSentApplyList(userId);
         return Result.success(applies);
     }
@@ -62,7 +62,7 @@ public class FriendController {
     @PostMapping("/apply/handle")
     @Operation(summary = "处理好友申请")
     public Result<String> handleFriendApply(
-            @RequestHeader("X-User-Id") Long userId,
+            @RequestAttribute("userId") Long userId,
             @Valid @RequestBody FriendHandleRequest request) {
         friendService.handleFriendApply(userId, request);
         return Result.success("处理成功");
@@ -71,7 +71,7 @@ public class FriendController {
     @PutMapping("/update")
     @Operation(summary = "更新好友信息")
     public Result<String> updateFriend(
-            @RequestHeader("X-User-Id") Long userId,
+            @RequestAttribute("userId") Long userId,
             @Valid @RequestBody FriendUpdateRequest request) {
         friendService.updateFriend(userId, request);
         return Result.success("更新成功");
@@ -80,7 +80,7 @@ public class FriendController {
     @DeleteMapping("/{friendId}")
     @Operation(summary = "删除好友")
     public Result<String> deleteFriend(
-            @RequestHeader("X-User-Id") Long userId,
+            @RequestAttribute("userId") Long userId,
             @PathVariable Long friendId) {
         friendService.deleteFriend(userId, friendId);
         return Result.success("删除成功");
@@ -89,7 +89,7 @@ public class FriendController {
     @GetMapping("/check/{friendId}")
     @Operation(summary = "检查是否是好有关系")
     public Result<Boolean> isFriend(
-            @RequestHeader("X-User-Id") Long userId,
+            @RequestAttribute("userId") Long userId,
             @PathVariable Long friendId) {
         boolean result = friendService.isFriend(userId, friendId);
         return Result.success(result);

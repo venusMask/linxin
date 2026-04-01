@@ -6,6 +6,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import org.linxin.server.auth.JwtService;
+import org.linxin.server.business.converter.UserConverter;
 import org.linxin.server.business.entity.User;
 import org.linxin.server.business.model.request.UserLoginRequest;
 import org.linxin.server.business.model.request.UserRegisterRequest;
@@ -25,12 +26,13 @@ public class AuthController {
 
     private final IUserService userService;
     private final JwtService jwtService;
+    private final UserConverter userConverter;
 
     @PostMapping("/register")
     @Operation(summary = "用户注册")
-    public Result<User> register(@Valid @RequestBody UserRegisterRequest request) {
+    public Result<UserVO> register(@Valid @RequestBody UserRegisterRequest request) {
         User user = userService.register(request);
-        return Result.success(user);
+        return Result.success(userConverter.toVO(user));
     }
 
     @PostMapping("/login")
@@ -49,7 +51,7 @@ public class AuthController {
 
     @GetMapping("/userinfo")
     @Operation(summary = "获取当前用户信息")
-    public Result<UserVO> getUserInfo(@RequestHeader("X-User-Id") Long userId) {
+    public Result<UserVO> getUserInfo(@RequestAttribute("userId") Long userId) {
         UserVO userVO = userService.getUserInfo(userId);
         return Result.success(userVO);
     }
