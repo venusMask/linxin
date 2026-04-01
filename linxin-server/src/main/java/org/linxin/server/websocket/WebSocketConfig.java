@@ -1,5 +1,6 @@
 package org.linxin.server.websocket;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;
 import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
@@ -13,6 +14,9 @@ public class WebSocketConfig implements WebSocketConfigurer {
     private final WebSocketHandler webSocketHandler;
     private final JwtService jwtService;
 
+    @Value("${websocket.allowed-origins:http://localhost:*}")
+    private String allowedOrigins;
+
     public WebSocketConfig(WebSocketHandler webSocketHandler, JwtService jwtService) {
         this.webSocketHandler = webSocketHandler;
         this.jwtService = jwtService;
@@ -20,8 +24,9 @@ public class WebSocketConfig implements WebSocketConfigurer {
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
+        String[] origins = allowedOrigins.split(",");
         registry.addHandler(webSocketHandler, "/ws")
-                .setAllowedOrigins("*")
+                .setAllowedOrigins(origins)
                 .addInterceptors(new WebSocketInterceptor(jwtService));
     }
 }

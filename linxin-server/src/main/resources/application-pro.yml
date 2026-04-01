@@ -13,3 +13,6 @@ spring:
 auth:
   secret: ${AUTH_SECRET}
   expire: 60
+
+websocket:
+  allowed-origins: "https://yourdomain.com"

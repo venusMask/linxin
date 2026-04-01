@@ -27,3 +27,6 @@ spring:
 auth:
   secret: ${AUTH_SECRET}
   expire: 1440
+
+websocket:
+  allowed-origins: "http://localhost:*,http://127.0.0.1:*"
