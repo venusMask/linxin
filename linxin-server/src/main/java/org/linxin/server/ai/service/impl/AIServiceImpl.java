@@ -57,8 +57,8 @@ public class AIServiceImpl implements AIService {
             log.info("Loaded {} AI tools, version: {}", tools.size(), toolsVersion);
         } catch (IOException e) {
             log.error("Failed to load AI tools from config", e);
-            tools = getDefaultTools();
-            toolsVersion = "1.0.0";
+            this.tools = new ArrayList<>();
+            this.toolsVersion = "1.0.0";
         }
     }
 
@@ -170,33 +170,6 @@ public class AIServiceImpl implements AIService {
             sb.append(String.format("操作 %d: %s\n", index++, call.getDescription()));
         }
         return sb.toString();
-    }
-
-    private List<AITool> getDefaultTools() {
-        List<AITool> defaultTools = new ArrayList<>();
-
-        AITool sendMessage = new AITool();
-        sendMessage.setId("send_message");
-        sendMessage.setName("sendMessage");
-        sendMessage.setDescription("发送消息给指定用户");
-        sendMessage.setRequireConfirm(true);
-        defaultTools.add(sendMessage);
-
-        AITool createGroup = new AITool();
-        createGroup.setId("create_group");
-        createGroup.setName("createGroup");
-        createGroup.setDescription("创建群聊并添加成员");
-        createGroup.setRequireConfirm(true);
-        defaultTools.add(createGroup);
-
-        AITool addFriend = new AITool();
-        addFriend.setId("add_friend");
-        addFriend.setName("addFriend");
-        addFriend.setDescription("申请添加指定用户为好友");
-        addFriend.setRequireConfirm(true);
-        defaultTools.add(addFriend);
-
-        return defaultTools;
     }
 
     @Scheduled(fixedRate = 3600000)

@@ -23,13 +23,18 @@ class MessageBubble extends StatelessWidget {
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: isMe ? Colors.green[400] : Colors.white,
-          borderRadius: BorderRadius.circular(8),
+          color: isMe ? const Color(0xFF00BFA5) : Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(16),
+            topRight: const Radius.circular(16),
+            bottomLeft: Radius.circular(isMe ? 16 : 4),
+            bottomRight: Radius.circular(isMe ? 4 : 16),
+          ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 1,
-              offset: const Offset(0, 1),
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
@@ -42,7 +47,7 @@ class MessageBubble extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(bottom: 4),
                 child: Text(
-                  message.senderNickname ?? '未知',
+                  message.senderNickname ?? '用户',
                   style: TextStyle(
                     color: Colors.grey[600],
                     fontSize: 12,
@@ -53,8 +58,9 @@ class MessageBubble extends StatelessWidget {
             Text(
               message.content,
               style: TextStyle(
-                color: isMe ? Colors.white : Colors.black87,
-                fontSize: 16,
+                color: isMe ? Colors.white : const Color(0xFF1F1F1F),
+                fontSize: 15.5,
+                height: 1.3,
               ),
             ),
             const SizedBox(height: 4),
@@ -64,8 +70,8 @@ class MessageBubble extends StatelessWidget {
                 Text(
                   _formatTime(time),
                   style: TextStyle(
-                    color: isMe ? Colors.white70 : Colors.grey[600],
-                    fontSize: 12,
+                    color: isMe ? Colors.white70 : Colors.grey[500],
+                    fontSize: 11,
                   ),
                 ),
                 if (isMe) ...[

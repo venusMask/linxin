@@ -129,6 +129,13 @@ class DatabaseService {
     return await db.rawQuery(sql, arguments);
   }
 
+  Future<void> clearUserData() async {
+    final db = await database;
+    await db.delete('messages');
+    await db.delete('conversations');
+    await db.delete('friends');
+  }
+
   Future<void> close() async {
     final db = await database;
     await db.close();

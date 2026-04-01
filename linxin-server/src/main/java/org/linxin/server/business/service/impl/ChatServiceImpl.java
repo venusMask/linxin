@@ -42,6 +42,7 @@ public class ChatServiceImpl implements IChatService {
     private final WebSocketHandler webSocketHandler;
     private final GroupMapper groupMapper;
     private final GroupMemberMapper groupMemberMapper;
+    private final org.linxin.server.business.mapper.MessageStatusMapper messageStatusMapper;
 
     @Override
     public IPage<ConversationVO> getConversationList(Long userId, Integer pageNum, Integer pageSize) {
@@ -120,6 +121,9 @@ public class ChatServiceImpl implements IChatService {
         
         updateSenderConversation(senderConversation, message, senderId);
         updateReceiverConversation(receiverConversation, receiverMessage, senderId);
+        
+        // 保存消息状态记录
+        saveMessageStatus(receiverMessage.getId(), request.getReceiverId());
         
         // 构建消息VO用于推送
         MessageVO messageVO = chatConverter.toVO(receiverMessage);
@@ -245,146 +249,112 @@ public class ChatServiceImpl implements IChatService {
 
     private void updateReceiverConversation(Conversation conversation, Message message, Long senderId) {
         User sender = userMapper.selectById(senderId);
-        conversation.setLastMessageId(message.getId());
-        conversation.setLastMessageContent(truncateContent(message.getContent(), 50));
-        conversation.setLastMessageType(message.getMessageType());
-        conversation.setLastMessageTime(message.getSendTime());
+        
+        com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<Conversation> updateWrapper = new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<>();
+        updateWrapper.eq(Conversation::getId, conversation.getId())
+                .set(Conversation::getLastMessageId, message.getId())
+                .set(Conversation::getLastMessageContent, truncateContent(message.getContent(), 50))
+                .set(Conversation::getLastMessageType, message.getMessageType())
+                .set(Conversation::getLastMessageTime, message.getSendTime());
+        
         if (conversation.getMuteStatus() == 0) {
-            conversation.setUnreadCount(conversation.getUnreadCount() + 1);
+            updateWrapper.setSql("unread_count = unread_count + 1");
         }
+        
         if (sender != null) {
-            conversation.setPeerNickname(sender.getNickname());
-            conversation.setPeerAvatar(sender.getAvatar());
+            updateWrapper.set(Conversation::getPeerNickname, sender.getNickname())
+                    .set(Conversation::getPeerAvatar, sender.getAvatar());
         }
-        conversationMapper.updateById(conversation);
+        
+        conversationMapper.update(null, updateWrapper);
     }
 
-    private String truncateContent(String content, int maxLength) {
-        if (content == null) return null;
-        return content.length() > maxLength ? content.substring(0, maxLength) + "..." : content;
+    private void saveMessageStatus(Long messageId, Long userId) {
+        org.linxin.server.business.entity.MessageStatus status = new org.linxin.server.business.entity.MessageStatus();
+        status.setMessageId(messageId);
+        status.setUserId(userId);
+        status.setReadStatus(0);
+        status.setCreateTime(LocalDateTime.now());
+        messageStatusMapper.insert(status);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Message sendGroupMessage(Long senderId, SendMessageRequest request) {
         Long groupId = request.getGroupId();
-        if (groupId == null) {
-            throw new RuntimeException("群ID不能为空");
-        }
-
         Group group = groupMapper.selectById(groupId);
         if (group == null || group.getDeleted() == 1) {
             throw new RuntimeException("群组不存在");
         }
 
-        GroupMember senderMember = getGroupMember(groupId, senderId);
-        if (senderMember == null) {
-            throw new RuntimeException("你不是群成员");
-        }
-
-        LambdaQueryWrapper<GroupMember> memberWrapper = new LambdaQueryWrapper<>();
-        memberWrapper.eq(GroupMember::getGroupId, groupId)
-                .eq(GroupMember::getDeleted, 0);
-        List<GroupMember> members = groupMemberMapper.selectList(memberWrapper);
-
-        LambdaQueryWrapper<Conversation> convWrapper = new LambdaQueryWrapper<>();
-        convWrapper.eq(Conversation::getGroupId, groupId)
-                .eq(Conversation::getDeleted, 0);
-        List<Conversation> conversations = conversationMapper.selectList(convWrapper);
-        Map<Long, Conversation> convMap = conversations.stream()
-                .collect(Collectors.toMap(Conversation::getUserId, c -> c));
+        List<GroupMember> members = groupMemberMapper.selectList(
+            new LambdaQueryWrapper<GroupMember>().eq(GroupMember::getGroupId, groupId).eq(GroupMember::getDeleted, 0)
+        );
 
         LocalDateTime sendTime = LocalDateTime.now();
-
-        Message message = new Message();
-        message.setSenderId(senderId);
-        message.setReceiverId(0L);
-        message.setGroupId(groupId);
-        message.setConversationId(0L);
-        message.setMessageType(request.getMessageType());
-        message.setContent(request.getContent());
-        message.setExtra(request.getExtra());
-        message.setSendStatus(SendStatus.SENT);
-        message.setSendTime(sendTime);
-        messageMapper.insert(message);
-
-        User sender = userMapper.selectById(senderId);
-        String senderNickname = sender != null ? sender.getNickname() : "未知";
-        String senderAvatar = sender != null ? sender.getAvatar() : null;
+        Message senderMsg = null;
 
         for (GroupMember member : members) {
-            Conversation conversation = convMap.get(member.getUserId());
-            if (conversation == null) {
-                continue;
-            }
+            Conversation conversation = getOrCreateGroupConversation(member.getUserId(), groupId, group.getName());
+            
+            Message message = new Message();
+            message.setConversationId(conversation.getId());
+            message.setSenderId(senderId);
+            message.setReceiverId(0L); 
+            message.setGroupId(groupId);
+            message.setMessageType(request.getMessageType());
+            message.setContent(request.getContent());
+            message.setExtra(request.getExtra());
+            message.setSendStatus(SendStatus.SENT);
+            message.setSendTime(sendTime);
+            messageMapper.insert(message);
 
-            conversation.setLastMessageId(message.getId());
-            conversation.setLastMessageContent(truncateContent(request.getContent(), 50));
-            conversation.setLastMessageType(request.getMessageType());
-            conversation.setLastMessageTime(sendTime);
-            if (!member.getUserId().equals(senderId) && conversation.getMuteStatus() == 0) {
-                conversation.setUnreadCount(conversation.getUnreadCount() + 1);
+            if (member.getUserId().equals(senderId)) {
+                senderMsg = message;
+                updateSenderConversation(conversation, message, senderId);
+            } else {
+                updateReceiverConversation(conversation, message, senderId);
+                saveMessageStatus(message.getId(), member.getUserId());
+                
+                // 推送
+                MessageVO messageVO = chatConverter.toVO(message);
+                User sender = userMapper.selectById(senderId);
+                if (sender != null) {
+                    messageVO.setSenderNickname(sender.getNickname());
+                    messageVO.setSenderAvatar(sender.getAvatar());
+                }
+                messageVO.setGroupId(groupId);
+                messageVO.setConversationType(1);
+                webSocketHandler.sendMessageToUser(member.getUserId(), 
+                    new org.linxin.server.websocket.WebSocketMessage("group_message", messageVO));
             }
-            conversationMapper.updateById(conversation);
         }
-
-        MessageVO messageVO = chatConverter.toVO(message);
-        messageVO.setSenderNickname(senderNickname);
-        messageVO.setSenderAvatar(senderAvatar);
-        messageVO.setGroupId(groupId);
-        messageVO.setConversationType(1);
-
-        final Message finalMessage = message;
-        members.stream()
-                .filter(m -> !m.getUserId().equals(senderId))
-                .forEach(member -> {
-                    webSocketHandler.sendMessageToUser(member.getUserId(),
-                            new WebSocketMessage("group_message", messageVO));
-                });
-
-        webSocketHandler.sendMessageToUser(senderId,
-                new WebSocketMessage("group_message", messageVO));
-
-        return message;
+        return senderMsg;
     }
 
-    @Override
-    public IPage<MessageVO> getGroupMessageList(Long groupId, Long userId, Integer pageNum, Integer pageSize) {
-        GroupMember member = getGroupMember(groupId, userId);
-        if (member == null) {
-            throw new RuntimeException("你不是群成员");
-        }
-
-        LambdaQueryWrapper<Conversation> convWrapper = new LambdaQueryWrapper<>();
-        convWrapper.eq(Conversation::getUserId, userId)
-                .eq(Conversation::getGroupId, groupId)
-                .eq(Conversation::getDeleted, 0);
-        Conversation conversation = conversationMapper.selectOne(convWrapper);
+    private Conversation getOrCreateGroupConversation(Long userId, Long groupId, String groupName) {
+        LambdaQueryWrapper<Conversation> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Conversation::getUserId, userId).eq(Conversation::getGroupId, groupId).eq(Conversation::getType, 1);
+        Conversation conversation = conversationMapper.selectOne(wrapper);
         if (conversation == null) {
-            return new Page<>();
+            conversation = new Conversation();
+            conversation.setUserId(userId);
+            conversation.setPeerId(0L);
+            conversation.setPeerNickname(groupName);
+            conversation.setType(1);
+            conversation.setGroupId(groupId);
+            conversation.setUnreadCount(0);
+            conversation.setTopStatus(0);
+            conversation.setMuteStatus(0);
+            conversation.setCreateTime(LocalDateTime.now());
+            conversationMapper.insert(conversation);
         }
+        return conversation;
+    }
 
-        Page<MessageVO> page = new Page<>(pageNum, pageSize);
-        IPage<Message> messagePage = messageMapper.selectMessagePage(page, conversation.getId());
-
-        Set<Long> senderIds = messagePage.getRecords().stream()
-                .map(Message::getSenderId)
-                .collect(Collectors.toSet());
-
-        Map<Long, User> userMap = userMapper.selectBatchIds(senderIds).stream()
-                .collect(Collectors.toMap(User::getId, u -> u));
-
-        return messagePage.convert(message -> {
-            MessageVO vo = chatConverter.toVO(message);
-            User sender = userMap.get(message.getSenderId());
-            if (sender != null) {
-                vo.setSenderNickname(sender.getNickname());
-                vo.setSenderAvatar(sender.getAvatar());
-            }
-            vo.setGroupId(groupId);
-            vo.setConversationType(1);
-            return vo;
-        });
+    private String truncateContent(String content, int maxLength) {
+        if (content == null) return null;
+        return content.length() > maxLength ? content.substring(0, maxLength) + "..." : content;
     }
 
     private GroupMember getGroupMember(Long groupId, Long userId) {
@@ -394,4 +364,5 @@ public class ChatServiceImpl implements IChatService {
                 .eq(GroupMember::getDeleted, 0);
         return groupMemberMapper.selectOne(wrapper);
     }
+}
 }

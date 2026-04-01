@@ -9,8 +9,8 @@ import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.locks.ReentrantLock;
 
 @Slf4j
@@ -19,11 +19,15 @@ public class WebSocketHandler extends TextWebSocketHandler {
 
     private static final ConcurrentHashMap<Long, WebSocketSession> sessions = new ConcurrentHashMap<>();
     private static final ConcurrentHashMap<Long, ReentrantLock> sessionLocks = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<Long, ConcurrentLinkedQueue<TextMessage>> pendingMessages = new ConcurrentHashMap<>();
+    
     private final ObjectMapper objectMapper;
+    private final IMessageBroker messageBroker;
+    private final IOfflineMessageService offlineMessageService;
 
-    public WebSocketHandler(ObjectMapper objectMapper) {
+    public WebSocketHandler(ObjectMapper objectMapper, IMessageBroker messageBroker, IOfflineMessageService offlineMessageService) {
         this.objectMapper = objectMapper;
+        this.messageBroker = messageBroker;
+        this.offlineMessageService = offlineMessageService;
     }
 
     @Override
@@ -32,47 +36,15 @@ public class WebSocketHandler extends TextWebSocketHandler {
         if (userId != null) {
             sessions.put(userId, session);
             sessionLocks.put(userId, new ReentrantLock());
-            pendingMessages.computeIfAbsent(userId, k -> new ConcurrentLinkedQueue<>());
             
-            sendPendingMessages(userId, session);
+            log.info("WebSocket connected: user {}", userId);
             
-            log.info("WebSocket connection established for user: {}", userId);
-        }
-    }
-    
-    private void sendPendingMessages(Long userId, WebSocketSession session) {
-        ConcurrentLinkedQueue<TextMessage> queue = pendingMessages.get(userId);
-        if (queue == null || queue.isEmpty()) {
-            return;
-        }
-        
-        ReentrantLock lock = getSessionLock(userId);
-        lock.lock();
-        try {
-            TextMessage message;
-            while ((message = queue.poll()) != null) {
-                if (session.isOpen()) {
-                    try {
-                        session.sendMessage(message);
-                        log.debug("Sent pending message to user: {}", userId);
-                    } catch (IOException e) {
-                        log.error("Error sending pending message to user {}", userId, e);
-                        queue.offer(message);
-                        break;
-                    }
-                } else {
-                    queue.offer(message);
-                    break;
-                }
+            // 离线消息拉取逻辑抽象
+            List<Object> pendingMessages = offlineMessageService.fetchAndClearMessages(userId);
+            for (Object msg : pendingMessages) {
+                pushMessageToLocalUser(userId, msg);
             }
-        } finally {
-            lock.unlock();
         }
-    }
-
-    @Override
-    protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
-        log.info("Received message: {}", message.getPayload());
     }
 
     @Override
@@ -81,47 +53,38 @@ public class WebSocketHandler extends TextWebSocketHandler {
         if (userId != null) {
             sessions.remove(userId);
             sessionLocks.remove(userId);
-            log.info("WebSocket connection closed for user: {}", userId);
+            log.info("WebSocket disconnected: user {}", userId);
         }
     }
 
-    private ReentrantLock getSessionLock(Long userId) {
-        return sessionLocks.computeIfAbsent(userId, k -> new ReentrantLock());
+    /**
+     * 业务调用入口
+     */
+    public void sendMessageToUser(Long userId, Object message) {
+        // 委托给经纪人处理跨机/本地分发
+        messageBroker.broadcastToUser(userId, message);
     }
 
-    public void sendMessageToUser(Long userId, Object message) {
-        ConcurrentLinkedQueue<TextMessage> messageQueue = pendingMessages.computeIfAbsent(userId, k -> new ConcurrentLinkedQueue<>());
+    /**
+     * 底层推送实现
+     */
+    public boolean pushMessageToLocalUser(Long userId, Object message) {
         WebSocketSession session = sessions.get(userId);
-
-        try {
-            String jsonMessage = objectMapper.writeValueAsString(message);
-            TextMessage textMessage = new TextMessage(jsonMessage);
-
-            ReentrantLock lock = getSessionLock(userId);
+        if (session != null && session.isOpen()) {
+            ReentrantLock lock = sessionLocks.computeIfAbsent(userId, k -> new ReentrantLock());
             lock.lock();
             try {
-                if (session != null && session.isOpen()) {
-                    session.sendMessage(textMessage);
-                    log.debug("Sent message to user: {}", userId);
-                } else {
-                    messageQueue.offer(textMessage);
-                    log.warn("Session not found or closed, message queued for user: {}", userId);
+                if (session.isOpen()) {
+                    String json = objectMapper.writeValueAsString(message);
+                    session.sendMessage(new TextMessage(json));
+                    return true;
                 }
+            } catch (IOException e) {
+                log.error("Failed to push message to user {}", userId, e);
             } finally {
                 lock.unlock();
             }
-        } catch (IOException e) {
-            log.error("Error sending message to user {}", userId, e);
         }
-    }
-
-    public void broadcastMessage(Object message) {
-        for (Long userId : sessions.keySet()) {
-            sendMessageToUser(userId, message);
-        }
-    }
-
-    public int getOnlineUserCount() {
-        return sessions.size();
+        return false;
     }
 }

@@ -15,7 +15,6 @@ class _AIChatPageState extends State<AIChatPage> {
   bool _isLoading = false;
   AIChatResponse? _pendingResponse;
   bool _showConfirmDialog = false;
-  String? _loadingMessageId;
 
   @override
   void dispose() {
@@ -79,30 +78,29 @@ class _AIChatPageState extends State<AIChatPage> {
     });
 
     for (final toolCall in _pendingResponse!.toolCalls) {
+      late int loadingIndex;
       setState(() {
         _messages.add(AIChatMessage(
           content: '正在执行: ${toolCall.description}...',
           isUser: false,
           isLoading: true,
         ));
-        _loadingMessageId = '${_messages.length - 1}';
+        loadingIndex = _messages.length - 1;
       });
 
       final result = await AIIntentService.instance.executeToolCall(toolCall);
 
-      setState(() {
-        if (_loadingMessageId != null) {
-          final index = int.tryParse(_loadingMessageId!);
-          if (index != null && index < _messages.length) {
-            _messages[index] = AIChatMessage(
+      if (mounted) {
+        setState(() {
+          if (loadingIndex < _messages.length) {
+            _messages[loadingIndex] = AIChatMessage(
               content: result.message,
               isUser: false,
               isError: !result.success,
             );
           }
-        }
-        _loadingMessageId = null;
-      });
+        });
+      }
     }
 
     setState(() {
@@ -151,30 +149,34 @@ class _AIChatPageState extends State<AIChatPage> {
 
   Future<String?> _showModifyDialog() async {
     final controller = TextEditingController();
-    return showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('修改操作'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            hintText: '请输入您的修改意见...',
-            border: OutlineInputBorder(),
+    try {
+      return await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('修改操作'),
+          content: TextField(
+            controller: controller,
+            decoration: const InputDecoration(
+              hintText: '请输入您的修改意见...',
+              border: OutlineInputBorder(),
+            ),
+            maxLines: 3,
           ),
-          maxLines: 3,
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, controller.text),
+              child: const Text('确认修改'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, controller.text),
-            child: const Text('确认修改'),
-          ),
-        ],
-      ),
-    );
+      );
+    } finally {
+      controller.dispose();
+    }
   }
 
   @override
@@ -340,6 +342,62 @@ class _AIChatPageState extends State<AIChatPage> {
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
         color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withValues(alpha: 0.2),
+            blurRadius: 4,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        child: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _inputController,
+                decoration: InputDecoration(
+                  hintText: '输入您想做的事...',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
+                ),
+                onSubmitted: (_) => _sendMessage(),
+              ),
+            ),
+            const SizedBox(width: 8),
+            IconButton(
+              icon: const Icon(Icons.send),
+              onPressed: _isLoading ? null : _sendMessage,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class AIChatMessage {
+  final String id;
+  final String content;
+  final bool isUser;
+  final bool isError;
+  final bool isLoading;
+  final AIChatResponse? response;
+
+  AIChatMessage({
+    required this.id,
+    required this.content,
+    required this.isUser,
+    this.isError = false,
+    this.isLoading = false,
+    this.response,
+  });
+}     color: Colors.white,
         boxShadow: [
           BoxShadow(
             color: Colors.grey.withValues(alpha: 0.2),

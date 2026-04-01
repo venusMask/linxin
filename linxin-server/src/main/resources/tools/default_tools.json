@@ -6,6 +6,7 @@
       "name": "sendMessage",
       "description": "发送消息给指定用户",
       "icon": "message",
+      "implemented": true,
       "requireConfirm": true,
       "params": [
         {
@@ -28,6 +29,7 @@
       "name": "createGroup",
       "description": "创建群聊并添加成员",
       "icon": "group_add",
+      "implemented": true,
       "requireConfirm": true,
       "params": [
         {
@@ -51,6 +53,7 @@
       "name": "addFriend",
       "description": "申请添加指定用户为好友",
       "icon": "person_add",
+      "implemented": true,
       "requireConfirm": true,
       "params": [
         {
@@ -73,6 +76,7 @@
       "name": "searchMessages",
       "description": "搜索聊天记录",
       "icon": "search",
+      "implemented": false,
       "requireConfirm": false,
       "params": [
         {
@@ -95,6 +99,7 @@
       "name": "setReminder",
       "description": "设置定时提醒",
       "icon": "alarm",
+      "implemented": false,
       "requireConfirm": true,
       "params": [
         {

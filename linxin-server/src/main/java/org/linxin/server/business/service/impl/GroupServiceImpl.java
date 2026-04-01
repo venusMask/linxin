@@ -122,7 +122,7 @@ public class GroupServiceImpl implements IGroupService {
         }
 
         GroupMember operator = getGroupMember(groupId, operatorId);
-        if (operator == null || operator.getRole() < ROLE_ADMIN) {
+        if (operator == null || operator.getRole() == ROLE_MEMBER) {
             throw new BusinessException("无权限操作");
         }
 
@@ -142,7 +142,7 @@ public class GroupServiceImpl implements IGroupService {
         }
 
         GroupMember operator = getGroupMember(groupId, operatorId);
-        if (operator == null || operator.getRole() < ROLE_ADMIN) {
+        if (operator == null || operator.getRole() == ROLE_MEMBER) {
             throw new BusinessException("无权限操作");
         }
 
@@ -247,7 +247,7 @@ public class GroupServiceImpl implements IGroupService {
         }
 
         GroupMember operator = getGroupMember(groupId, operatorId);
-        if (operator == null || operator.getRole() < ROLE_ADMIN) {
+        if (operator == null || operator.getRole() == ROLE_MEMBER) {
             throw new BusinessException("无权限操作");
         }
 

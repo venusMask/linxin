@@ -7,14 +7,18 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.linxin.server.business.entity.Message;
+import org.linxin.server.business.vo.MessageVO;
+
+import java.util.List;
 
 @Mapper
 public interface MessageMapper extends BaseMapper<Message> {
 
     @Select("SELECT m.*, u.nickname as sender_nickname, u.avatar as sender_avatar " +
-            "FROM messages m " +
+            "FROM message_status ms " +
+            "JOIN messages m ON ms.message_id = m.id " +
             "LEFT JOIN users u ON m.sender_id = u.id " +
-            "WHERE m.conversation_id = #{conversationId} AND m.deleted = 0 " +
-            "ORDER BY m.send_time DESC")
-    IPage<Message> selectMessagePage(Page<?> page, @Param("conversationId") Long conversationId);
+            "WHERE ms.user_id = #{userId} AND ms.read_status = 0 AND ms.deleted = 0 " +
+            "ORDER BY m.send_time ASC")
+    List<MessageVO> selectUnreadMessages(@Param("userId") Long userId);
 }

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/chat.dart';
 import '../services/data_service.dart';
 import '../services/websocket_service.dart';
@@ -16,26 +17,24 @@ class ChatListPage extends StatefulWidget {
 }
 
 class _ChatListPageState extends State<ChatListPage> {
-  final DataService _dataService = DataService();
   final WebSocketService _webSocketService = WebSocketService();
-  List<Chat> _chats = [];
   StreamSubscription<dynamic>? _messageSubscription;
   StreamSubscription<dynamic>? _groupMessageSubscription;
 
   @override
   void initState() {
     super.initState();
-    _loadChats();
     _initWebSocketListeners();
   }
 
   void _initWebSocketListeners() {
+    final dataService = context.read<DataService>();
     _messageSubscription = _webSocketService.messageStream.listen((data) {
-      _handleWebSocketMessage(data);
+      _handleWebSocketMessage(data, dataService);
     });
 
     _groupMessageSubscription = _webSocketService.groupMessageStream.listen((data) {
-      _handleGroupWebSocketMessage(data);
+      _handleGroupWebSocketMessage(data, dataService);
     });
   }
 
@@ -44,12 +43,6 @@ class _ChatListPageState extends State<ChatListPage> {
     _messageSubscription?.cancel();
     _groupMessageSubscription?.cancel();
     super.dispose();
-  }
-
-  void _loadChats() {
-    setState(() {
-      _chats = List.from(_dataService.chats);
-    });
   }
 
   String _formatTime(DateTime time) {
@@ -69,35 +62,54 @@ class _ChatListPageState extends State<ChatListPage> {
     }
   }
 
-  void _handleWebSocketMessage(dynamic data) {
+  void _handleWebSocketMessage(dynamic data, DataService dataService) {
     if (data['type'] == 'new_message') {
-      _loadChats();
+      _updateChatFromMessage(data['data'], dataService);
     } else if (data['type'] == 'read_status') {
-      _loadChats();
+      final messageData = data['data'];
+      final conversationId = messageData['conversationId']?.toString();
+      if (conversationId != null) {
+        dataService.markAsRead(conversationId);
+      }
     }
   }
 
-  void _handleGroupWebSocketMessage(dynamic data) {
+  void _handleGroupWebSocketMessage(dynamic data, DataService dataService) {
     if (data['type'] == 'group_message') {
-      _loadChats();
+      _updateChatFromMessage(data['data'], dataService);
     }
+  }
+
+  void _updateChatFromMessage(dynamic messageData, DataService dataService) {
+    if (!mounted) return;
+    final conversationId = messageData['conversationId']?.toString();
+    if (conversationId == null) return;
+    
+    final chat = dataService.getChatById(conversationId);
+    if (chat == null) {
+      return;
+    }
+
+    dataService.addMessage(
+      conversationId, 
+      messageData['content']?.toString() ?? '', 
+      DateTime.now()
+    );
   }
 
   void _createGroup() async {
-    final result = await Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => const CreateGroupPage(),
       ),
     );
-
-    if (result != null) {
-      _loadChats();
-    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final chats = context.watch<DataService>().chats;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -125,7 +137,7 @@ class _ChatListPageState extends State<ChatListPage> {
         elevation: 0.5,
         centerTitle: true,
       ),
-      body: _chats.isEmpty
+      body: chats.isEmpty
           ? Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -153,28 +165,23 @@ class _ChatListPageState extends State<ChatListPage> {
               ),
             )
           : ListView.builder(
-              itemCount: _chats.length,
+              itemCount: chats.length,
               itemBuilder: (context, index) {
-                final chat = _chats[index];
-                return _buildChatItem(chat);
+                final chat = chats[index];
+                return _buildChatItem(chat, context);
               },
             ),
     );
   }
 
-  Widget _buildChatItem(Chat chat) {
+  Widget _buildChatItem(Chat chat, BuildContext context) {
     final isGroup = chat.type == ChatType.group;
     final avatarTag = isGroup ? 'group_avatar_${chat.id}' : 'avatar_${chat.friend?.id ?? chat.id}';
+    final dataService = context.read<DataService>();
 
     return InkWell(
       onTap: () async {
-        _dataService.markAsRead(chat.id);
-        setState(() {
-          final index = _chats.indexWhere((c) => c.id == chat.id);
-          if (index != -1) {
-            _chats[index] = chat.copyWith(unreadCount: 0);
-          }
-        });
+        dataService.markAsRead(chat.id);
 
         await Navigator.push(
           context,
@@ -182,8 +189,6 @@ class _ChatListPageState extends State<ChatListPage> {
             builder: (context) => ChatDetailPage(chat: chat),
           ),
         );
-
-        _loadChats();
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),

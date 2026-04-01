@@ -1,8 +1,9 @@
+import 'package:flutter/foundation.dart';
 import '../models/chat.dart';
 import '../models/friend.dart';
 import '../models/message.dart';
 
-class DataService {
+class DataService extends ChangeNotifier {
   static final DataService _instance = DataService._internal();
   factory DataService() => _instance;
   DataService._internal();
@@ -16,6 +17,19 @@ class DataService {
   void initMockData() {
     _friends.clear();
     _chats.clear();
+    notifyListeners();
+  }
+
+  void updateFriends(List<Friend> newFriends) {
+    _friends.clear();
+    _friends.addAll(newFriends);
+    notifyListeners();
+  }
+
+  void updateChats(List<Chat> newChats) {
+    _chats.clear();
+    _chats.addAll(newChats);
+    notifyListeners();
   }
 
   Friend? getFriendById(String id) {
@@ -57,18 +71,27 @@ class DataService {
       unreadCount: 0,
     );
     _chats.add(newChat);
+    notifyListeners();
     return newChat;
   }
 
-  void addMessage(String chatId, Message message) {
+  void addMessage(String chatId, String content, DateTime time) {
     final chat = getChatById(chatId);
     if (chat != null) {
-      final updatedMessages = List<Message>.from(chat.messages)..add(message);
       final index = _chats.indexWhere((c) => c.id == chatId);
       _chats[index] = chat.copyWith(
-        messages: updatedMessages,
-        lastTime: message.time,
+        lastMessage: content,
+        lastTime: time,
+        unreadCount: chat.unreadCount + 1,
       );
+      
+      // Move to top
+      if (index > 0) {
+        final updatedChat = _chats.removeAt(index);
+        _chats.insert(0, updatedChat);
+      }
+      
+      notifyListeners();
     }
   }
 
@@ -76,6 +99,7 @@ class DataService {
     final index = _chats.indexWhere((chat) => chat.id == chatId);
     if (index != -1) {
       _chats[index] = _chats[index].copyWith(unreadCount: 0);
+      notifyListeners();
     }
   }
 
@@ -83,6 +107,7 @@ class DataService {
     final index = _chats.indexWhere((chat) => chat.id == chatId);
     if (index != -1) {
       _chats[index] = _chats[index].copyWith(lastTime: time);
+      notifyListeners();
     }
   }
 }

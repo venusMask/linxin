@@ -8,6 +8,7 @@ import '../services/http_service.dart';
 import '../services/websocket_service.dart';
 import '../services/db_service.dart';
 import '../services/message_local_service.dart';
+import '../services/auth_service.dart';
 import '../services/event_bus.dart';
 import '../widgets/message_bubble.dart';
 import 'group_settings_page.dart';
@@ -47,7 +48,7 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
   @override
   void initState() {
     super.initState();
-    _currentUserId = widget.currentUser?.id.toString();
+    _currentUserId = AuthService().currentUser?.id?.toString();
     _messageLocalService = MessageLocalService(DatabaseService());
     _messages = List.from(widget.chat.messages);
     _scrollToBottom();
@@ -196,6 +197,11 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
       await _messageLocalService.markAsRead(widget.chat.id);
     } catch (e) {
       debugPrint('标记已读失败: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('同步已读状态失败: $e')),
+        );
+      }
     }
   }
 
@@ -257,12 +263,14 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
 
       await _messageLocalService.saveMessage(serverMessage);
 
-      setState(() {
-        final index = _messages.indexWhere((m) => m.id == pendingMessage.id);
-        if (index != -1) {
-          _messages[index] = serverMessage;
-        }
-      });
+      if (mounted) {
+        setState(() {
+          final index = _messages.indexWhere((m) => m.id == pendingMessage.id);
+          if (index != -1) {
+            _messages[index] = serverMessage;
+          }
+        });
+      }
 
       if (_isGroupChat) {
         _webSocketService.sendGroupMessage(
@@ -281,12 +289,17 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
     } catch (e) {
       debugPrint('发送消息失败: $e');
 
-      setState(() {
-        final index = _messages.indexWhere((m) => m.id == pendingMessage.id);
-        if (index != -1) {
-          _messages[index] = pendingMessage.copyWith(status: -1);
-        }
-      });
+      if (mounted) {
+        setState(() {
+          final index = _messages.indexWhere((m) => m.id == pendingMessage.id);
+          if (index != -1) {
+            _messages[index] = pendingMessage.copyWith(status: -1);
+          }
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('发送失败: $e')),
+        );
+      }
     }
   }
 
@@ -365,14 +378,14 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
             ),
           ),
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.withValues(alpha: 0.2),
-                  blurRadius: 4,
+                  color: Colors.black.withOpacity(0.04),
                   offset: const Offset(0, -2),
+                  blurRadius: 10,
                 ),
               ],
             ),
@@ -380,25 +393,38 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
               child: Row(
                 children: [
                   Expanded(
-                    child: TextField(
-                      controller: _messageController,
-                      decoration: InputDecoration(
-                        hintText: _isGroupChat ? '在群聊中说点什么...' : '输入消息...',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF3F3F3),
+                        borderRadius: BorderRadius.circular(24),
                       ),
-                      onSubmitted: (_) => _sendMessage(),
+                      child: TextField(
+                        controller: _messageController,
+                        decoration: InputDecoration(
+                          hintText: _isGroupChat ? '在群聊中说点什么...' : '输入消息...',
+                          hintStyle: const TextStyle(color: Color(0xFF9E9E9E), fontSize: 15),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        ),
+                        maxLines: 4,
+                        minLines: 1,
+                        textInputAction: TextInputAction.send,
+                        onSubmitted: (_) => _sendMessage(),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  IconButton(
-                    icon: const Icon(Icons.send),
-                    onPressed: _sendMessage,
+                  GestureDetector(
+                    onTap: _sendMessage,
+                    child: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: const BoxDecoration(
+                        color: Color(0xFF00BFA5),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.send_rounded, color: Colors.white, size: 20),
+                    ),
                   ),
                 ],
               ),

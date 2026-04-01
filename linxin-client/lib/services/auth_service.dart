@@ -4,6 +4,7 @@ import '../config/api_config.dart';
 import '../models/user.dart';
 import 'http_service.dart';
 import 'websocket_service.dart';
+import 'db_service.dart';
 
 class AuthService extends ChangeNotifier {
   static final AuthService _instance = AuthService._internal();
@@ -107,11 +108,12 @@ class AuthService extends ChangeNotifier {
     await prefs.remove('auth_nickname');
   }
 
-  void logout() {
+  Future<void> logout() async {
     _currentUser = null;
     _httpService.clearToken();
     WebSocketService().disconnect();
-    _clearAuthData();
+    await _clearAuthData();
+    await DatabaseService().clearUserData();
     notifyListeners();
   }
 
