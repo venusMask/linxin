@@ -24,7 +24,9 @@ public class WebSocketConfig implements WebSocketConfigurer {
 
     @Override
     public void registerWebSocketHandlers(WebSocketHandlerRegistry registry) {
-        String[] origins = allowedOrigins.split(",");
+        String[] origins = allowedOrigins == null || allowedOrigins.isBlank()
+                ? new String[0]
+                : allowedOrigins.trim().split("\\s*,\\s*");
         registry.addHandler(webSocketHandler, "/ws")
                 .setAllowedOrigins(origins)
                 .addInterceptors(new WebSocketInterceptor(jwtService));
