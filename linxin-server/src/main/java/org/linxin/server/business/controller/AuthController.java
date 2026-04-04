@@ -82,11 +82,4 @@ public class AuthController {
         emailVerificationService.sendVerificationCode(request.getEmail());
         return Result.success(null);
     }
-
-    @PostMapping("/email/verify-code")
-    @Operation(summary = "验证邮箱验证码")
-    public Result<Void> verifyEmailCode(@Valid @RequestBody VerifyEmailCodeRequest request) {
-        emailVerificationService.verifyCode(request.getEmail(), request.getCode());
-        return Result.success(null);
-    }
 }

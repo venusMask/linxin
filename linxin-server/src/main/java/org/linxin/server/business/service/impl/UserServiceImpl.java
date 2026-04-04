@@ -10,6 +10,7 @@ import org.linxin.server.business.entity.User;
 import org.linxin.server.business.mapper.UserMapper;
 import org.linxin.server.business.model.request.UserLoginRequest;
 import org.linxin.server.business.model.request.UserRegisterRequest;
+import org.linxin.server.business.service.IEmailVerificationService;
 import org.linxin.server.business.service.IUserService;
 import org.linxin.server.business.vo.UserVO;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -23,6 +24,7 @@ public class UserServiceImpl implements IUserService {
     private final UserMapper userMapper;
     private final PasswordEncoder passwordEncoder;
     private final UserConverter userConverter;
+    private final IEmailVerificationService emailVerificationService;
 
     @Transactional(rollbackFor = Exception.class)
     @Override
@@ -32,6 +34,14 @@ public class UserServiceImpl implements IUserService {
         if (userMapper.selectCount(wrapper) > 0) {
             throw new RuntimeException("用户名已存在");
         }
+
+        LambdaQueryWrapper<User> emailWrapper = new LambdaQueryWrapper<>();
+        emailWrapper.eq(User::getEmail, request.getEmail());
+        if (userMapper.selectCount(emailWrapper) > 0) {
+            throw new RuntimeException("该邮箱已被注册");
+        }
+
+        emailVerificationService.verifyCode(request.getEmail(), request.getVerificationCode());
 
         User user = new User();
         user.setUsername(request.getUsername());

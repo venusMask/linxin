@@ -23,7 +23,6 @@ class _RegisterPageState extends State<RegisterPage> {
   bool _isSendingCode = false;
   String? _errorMessage;
   int _countdown = 0;
-  bool _emailVerified = false;
 
   @override
   void dispose() {
@@ -105,60 +104,8 @@ class _RegisterPageState extends State<RegisterPage> {
     return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
   }
 
-  Future<void> _verifyEmail() async {
-    final email = _emailController.text.trim();
-    final code = _verificationCodeController.text.trim();
-
-    if (email.isEmpty || code.isEmpty) {
-      setState(() {
-        _errorMessage = '请输入邮箱和验证码';
-      });
-      return;
-    }
-
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-
-    try {
-      await _authService.verifyEmailCode(email, code);
-      
-      if (mounted) {
-        setState(() {
-          _emailVerified = true;
-        });
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('邮箱验证成功'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      String message = e.toString().replaceAll('Exception: ', '');
-      setState(() {
-        _errorMessage = '验证失败: ${message.split(':').last.trim()}';
-      });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
-    }
-  }
-
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) {
-      return;
-    }
-
-    if (!_emailVerified) {
-      setState(() {
-        _errorMessage = '请先验证邮箱';
-      });
       return;
     }
 
@@ -174,6 +121,8 @@ class _RegisterPageState extends State<RegisterPage> {
         nickname: _nicknameController.text.trim().isEmpty
             ? null
             : _nicknameController.text.trim(),
+        email: _emailController.text.trim(),
+        verificationCode: _verificationCodeController.text.trim(),
       );
 
       if (mounted) {
@@ -331,46 +280,22 @@ class _RegisterPageState extends State<RegisterPage> {
                   ],
                 ),
                 const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextFormField(
-                        controller: _verificationCodeController,
-                        decoration: const InputDecoration(
-                          labelText: '验证码',
-                          hintText: '请输入验证码',
-                          prefixIcon: Icon(Icons.verified_user),
-                          border: OutlineInputBorder(),
-                        ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return '请输入验证码';
-                          }
-                          return null;
-                        },
-                        enabled: !_isLoading && !_isSendingCode,
-                        keyboardType: TextInputType.number,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    ElevatedButton(
-                      onPressed: _isLoading
-                          ? null
-                          : _verifyEmail,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _emailVerified ? Colors.grey : Colors.green[600],
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 16,
-                        ),
-                      ),
-                      child: Text(
-                        _emailVerified ? '已验证' : '验证邮箱',
-                        style: const TextStyle(fontSize: 14),
-                      ),
-                    ),
-                  ],
+                TextFormField(
+                  controller: _verificationCodeController,
+                  decoration: const InputDecoration(
+                    labelText: '验证码',
+                    hintText: '请输入验证码',
+                    prefixIcon: Icon(Icons.verified_user),
+                    border: OutlineInputBorder(),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.trim().isEmpty) {
+                      return '请输入验证码';
+                    }
+                    return null;
+                  },
+                  enabled: !_isLoading && !_isSendingCode,
+                  keyboardType: TextInputType.number,
                 ),
                 const SizedBox(height: 24),
                 Text(

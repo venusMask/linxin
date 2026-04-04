@@ -51,6 +51,8 @@ class AuthService extends ChangeNotifier {
     required String username,
     required String password,
     String? nickname,
+    required String email,
+    required String verificationCode,
   }) async {
     final response = await _httpService.post(
       ApiConfig.register,
@@ -58,6 +60,8 @@ class AuthService extends ChangeNotifier {
         'username': username,
         'password': password,
         'nickname': nickname ?? username,
+        'email': email,
+        'verificationCode': verificationCode,
       },
     );
     return User.fromJson(response.data);
@@ -68,21 +72,6 @@ class AuthService extends ChangeNotifier {
       await _httpService.post(
         ApiConfig.sendEmailCode,
         data: {'email': email},
-      );
-      return true;
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  Future<bool> verifyEmailCode(String email, String code) async {
-    try {
-      await _httpService.post(
-        ApiConfig.verifyEmailCode,
-        data: {
-          'email': email,
-          'code': code,
-        },
       );
       return true;
     } catch (e) {
