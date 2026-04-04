@@ -17,11 +17,13 @@ public class OpenAIAdapter implements AIModelAdapter {
     private final String baseUrl;
     private final String apiKey;
     private final String model;
+    private final String providerName; // 新增
     private final double temperature;
     private final ObjectMapper objectMapper;
 
-    public OpenAIAdapter(String baseUrl, String apiKey, String model, double temperature) {
+    public OpenAIAdapter(String providerName, String baseUrl, String apiKey, String model, double temperature) {
         this.restTemplate = new RestTemplate();
+        this.providerName = providerName;
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
         this.apiKey = apiKey;
         this.model = model;
@@ -52,7 +54,7 @@ public class OpenAIAdapter implements AIModelAdapter {
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(requestBody, headers);
 
             ResponseEntity<String> response = restTemplate.exchange(
-                    baseUrl + "/v1/chat/completions",
+                    baseUrl + "/chat/completions",
                     HttpMethod.POST,
                     entity,
                     String.class
@@ -66,9 +68,16 @@ public class OpenAIAdapter implements AIModelAdapter {
             return createErrorResponse("AI服务返回异常状态码: " + response.getStatusCode());
         } catch (Exception e) {
             log.error("OpenAI chat failed", e);
-            return createErrorResponse("AI服务调用失败: " + e.getMessage());
+            if (e instanceof RuntimeException) throw (RuntimeException) e;
+            throw new RuntimeException(e);
         }
     }
+
+    @Override
+    public String getProviderName() { return providerName; }
+
+    @Override
+    public String getModelName() { return model; }
 
     private String buildSystemPrompt(List<AITool> tools) {
         StringBuilder sb = new StringBuilder();
@@ -87,12 +96,6 @@ public class OpenAIAdapter implements AIModelAdapter {
         sb.append("  \"aiText\": \"对用户的确认提示语\",\n");
         sb.append("  \"needConfirm\": true\n");
         sb.append("}\n\n");
-        sb.append("重要规则：\n");
-        sb.append("1. 必须返回有效的JSON\n");
-        sb.append("2. intent使用英文驼峰命名：sendMessage, createGroup, addFriend等\n");
-        sb.append("3. toolName必须与可用tools中的name完全一致\n");
-        sb.append("4. 如果无法解析用户意图，返回空toolCalls和解释文字\n");
-        sb.append("5. 只有执行操作时才需要确认(needConfirm=true)\n");
         return sb.toString();
     }
 
@@ -101,32 +104,22 @@ public class OpenAIAdapter implements AIModelAdapter {
             Map<String, Object> function = new HashMap<>();
             function.put("name", tool.getName());
             function.put("description", tool.getDescription());
-
             Map<String, Object> properties = new HashMap<>();
             List<String> required = new ArrayList<>();
-
             if (tool.getParams() != null) {
                 for (var param : tool.getParams()) {
                     Map<String, Object> paramMap = new HashMap<>();
                     paramMap.put("type", param.getType());
                     paramMap.put("description", param.getDescription());
-                    if (param.getEnumValues() != null) {
-                        paramMap.put("enum", param.getEnumValues());
-                    }
                     properties.put(param.getName(), paramMap);
-                    if (param.isRequired()) {
-                        required.add(param.getName());
-                    }
+                    if (param.isRequired()) required.add(param.getName());
                 }
             }
-
             Map<String, Object> parameters = new HashMap<>();
             parameters.put("type", "object");
             parameters.put("properties", properties);
             parameters.put("required", required);
-
             function.put("parameters", parameters);
-
             Map<String, Object> result = new HashMap<>();
             result.put("type", "function");
             result.put("function", function);
@@ -137,13 +130,21 @@ public class OpenAIAdapter implements AIModelAdapter {
     @SuppressWarnings("unchecked")
     private ChatResponse parseResponse(Map<String, Object> responseMap) {
         ChatResponse chatResponse = new ChatResponse();
+        
+        // 解析 Usage
+        Map<String, Object> usageMap = (Map<String, Object>) responseMap.get("usage");
+        if (usageMap != null) {
+            ChatResponse.Usage usage = new ChatResponse.Usage();
+            usage.setPromptTokens((int) usageMap.getOrDefault("prompt_tokens", 0));
+            usage.setCompletionTokens((int) usageMap.getOrDefault("completion_tokens", 0));
+            usage.setTotalTokens((int) usageMap.getOrDefault("total_tokens", 0));
+            chatResponse.setUsage(usage);
+        }
 
         List<Map<String, Object>> choices = (List<Map<String, Object>>) responseMap.get("choices");
         if (choices == null || choices.isEmpty()) {
             chatResponse.setIntent("chat");
-            chatResponse.setToolCalls(Collections.emptyList());
             chatResponse.setAiText("AI无响应");
-            chatResponse.setNeedConfirm(false);
             return chatResponse;
         }
 
@@ -155,49 +156,32 @@ public class OpenAIAdapter implements AIModelAdapter {
             List<ChatResponse.ToolCall> calls = new ArrayList<>();
             for (Map<String, Object> call : toolCalls) {
                 Map<String, Object> function = (Map<String, Object>) call.get("function");
-                String argumentsStr = (String) function.get("arguments");
-
-                Map<String, Object> params = new HashMap<>();
-                if (argumentsStr != null && !argumentsStr.isEmpty()) {
-                    try {
-                        params = objectMapper.readValue(argumentsStr, Map.class);
-                    } catch (Exception e) {
-                        log.warn("Failed to parse arguments: {}", argumentsStr);
-                    }
-                }
-
                 ChatResponse.ToolCall toolCall = new ChatResponse.ToolCall();
-                toolCall.setToolId("");
                 toolCall.setToolName((String) function.get("name"));
-                toolCall.setParams(params);
-                toolCall.setDescription("");
+                try {
+                    toolCall.setParams(objectMapper.readValue((String) function.get("arguments"), Map.class));
+                } catch (Exception e) {}
                 calls.add(toolCall);
             }
-
             chatResponse.setIntent("tool_call");
             chatResponse.setToolCalls(calls);
-            chatResponse.setAiText(content != null ? content : "即将执行 " + calls.size() + " 个操作");
+            chatResponse.setAiText(content != null ? content : "执行操作中");
             chatResponse.setNeedConfirm(true);
         } else {
             chatResponse.setIntent("chat");
-            chatResponse.setToolCalls(Collections.emptyList());
             chatResponse.setAiText(content != null ? content : "");
             chatResponse.setNeedConfirm(false);
         }
-
         return chatResponse;
     }
 
     private ChatResponse createErrorResponse(String errorMessage) {
         ChatResponse errorResponse = new ChatResponse();
         errorResponse.setIntent("error");
-        errorResponse.setToolCalls(Collections.emptyList());
         errorResponse.setAiText(errorMessage);
-        errorResponse.setNeedConfirm(false);
         return errorResponse;
     }
 
     @Override
-    public void dispose() {
-    }
+    public void dispose() {}
 }

@@ -6,5 +6,7 @@ import java.util.List;
 
 public interface AIModelAdapter {
     ChatResponse chat(String userInput, List<AITool> tools);
+    String getProviderName();
+    String getModelName();
     void dispose();
 }

@@ -42,8 +42,7 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
   Group? _group;
 
   late final StreamSubscription<MessageSentEvent> _messageSentSubscription;
-  StreamSubscription<dynamic>? _wsMessageSubscription;
-  StreamSubscription<dynamic>? _wsGroupMessageSubscription;
+  late final StreamSubscription<MessageReceivedEvent> _messageReceivedSubscription;
 
   @override
   void initState() {
@@ -52,7 +51,6 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
     _messageLocalService = MessageLocalService(DatabaseService());
     _messages = List.from(widget.chat.messages);
     _scrollToBottom();
-    _initWebSocket();
     _initEventBus();
     _messagesFuture = _loadLocalMessages();
     if (_isGroupChat) {
@@ -75,8 +73,7 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
   @override
   void dispose() {
     _messageSentSubscription.cancel();
-    _wsMessageSubscription?.cancel();
-    _wsGroupMessageSubscription?.cancel();
+    _messageReceivedSubscription.cancel();
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -86,7 +83,7 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
     _messageSentSubscription = _eventBus.on<MessageSentEvent>().listen((event) {
       if (!mounted) return;
       if (event.conversationId == widget.chat.id) {
-        final newMessage = Message(
+        _addNewMessage(Message(
           id: event.messageId,
           conversationId: event.conversationId,
           senderId: event.senderId,
@@ -95,101 +92,41 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
           status: 1,
           createdAt: event.timestamp,
           isRead: false,
-        );
+          isMe: true,
+        ));
+      }
+    });
 
-        final exists = _messages.any((m) => m.id == newMessage.id);
-        if (!exists) {
-          setState(() {
-            _messages.add(newMessage);
-          });
-          _scrollToBottom();
-        }
+    _messageReceivedSubscription = _eventBus.on<MessageReceivedEvent>().listen((event) {
+      if (!mounted) return;
+      if (event.conversationId == widget.chat.id) {
+        _addNewMessage(Message(
+          id: event.messageId,
+          conversationId: event.conversationId,
+          senderId: event.senderId,
+          content: event.content,
+          messageType: 1,
+          status: 1,
+          createdAt: event.createdAt,
+          isRead: true, // 已经在当前页面，设为已读
+          isMe: false,
+        ));
+        _markAsRead(); // 同步到服务端
       }
     });
   }
 
-  void _initWebSocket() {
-    if (_isGroupChat) {
-      _wsGroupMessageSubscription = _webSocketService.groupMessageStream.listen((data) {
-        if (!mounted) return;
-        if (data['type'] == 'group_message') {
-          final messageData = data['data'];
-          final groupId = messageData['groupId']?.toString();
-          if (groupId != _group?.id) return;
-
-          final senderId = messageData['senderId']?.toString() ?? '';
-          final isMe = senderId == _currentUserId;
-
-          final newMessage = Message.fromJson({
-            'id': messageData['id']?.toString() ?? '',
-            'conversationId': messageData['conversationId']?.toString() ?? widget.chat.id,
-            'senderId': senderId,
-            'senderNickname': messageData['senderNickname'] ?? '',
-            'senderAvatar': messageData['senderAvatar'] ?? '',
-            'content': messageData['content'] ?? '',
-            'messageType': messageData['messageType'] ?? 1,
-            'status': messageData['status'] ?? 1,
-            'createdAt': messageData['createdAt'] ?? messageData['sendTime'] ?? DateTime.now().toIso8601String(),
-            'isRead': false,
-            'isMe': isMe,
-            'groupId': groupId,
-            'conversationType': 1,
-          });
-
-          _messageLocalService.saveMessage(newMessage);
-
-          setState(() {
-            final exists = _messages.any((m) => m.id == newMessage.id);
-            if (!exists) {
-              _messages.add(newMessage);
-            }
-          });
-
-          _scrollToBottom();
-
-          if (!isMe) {
-            _markAsRead();
-          }
-        }
-      });
-    } else {
-      _wsMessageSubscription = _webSocketService.messageStream.listen((data) {
-        if (!mounted) return;
-        if (data['type'] == 'new_message') {
-          final messageData = data['data'];
-          final senderId = messageData['senderId']?.toString() ?? '';
-          final isMe = senderId == _currentUserId;
-
-          final newMessage = Message.fromJson({
-            'id': messageData['id']?.toString() ?? '',
-            'conversationId': messageData['conversationId']?.toString() ?? widget.chat.id,
-            'senderId': senderId,
-            'content': messageData['content'] ?? '',
-            'messageType': messageData['messageType'] ?? 1,
-            'status': messageData['status'] ?? 1,
-            'createdAt': messageData['createdAt'] ?? messageData['sendTime'] ?? DateTime.now().toIso8601String(),
-            'isRead': false,
-            'isMe': isMe,
-          });
-
-          _messageLocalService.saveMessage(newMessage);
-
-          setState(() {
-            final exists = _messages.any((m) => m.id == newMessage.id);
-            if (!exists) {
-              _messages.add(newMessage);
-            }
-          });
-
-          _scrollToBottom();
-
-          if (!isMe) {
-            _markAsRead();
-          }
-        }
-      });
-    }
+  void _addNewMessage(Message message) {
+    setState(() {
+      final exists = _messages.any((m) => m.id == message.id);
+      if (!exists) {
+        _messages.add(message);
+      }
+    });
+    _scrollToBottom();
   }
+
+  // _initWebSocket removed to use EventBus instead
 
   Future<void> _markAsRead() async {
     try {
@@ -383,7 +320,7 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.04),
+                  color: Colors.black.withValues(alpha: 0.04),
                   offset: const Offset(0, -2),
                   blurRadius: 10,
                 ),

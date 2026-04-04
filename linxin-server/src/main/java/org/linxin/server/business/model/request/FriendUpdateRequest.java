@@ -10,4 +10,6 @@ public class FriendUpdateRequest {
     
     private String friendNickname;
     private String friendGroup;
+
+    private String tags;
 }

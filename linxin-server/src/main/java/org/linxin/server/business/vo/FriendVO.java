@@ -14,6 +14,7 @@ public class FriendVO {
     private String avatar;
     private String friendNickname;
     private String friendGroup;
+    private String tags;
     private String signature;
     private Integer userStatus;
     private LocalDateTime createTime;

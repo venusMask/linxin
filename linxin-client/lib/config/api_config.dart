@@ -6,6 +6,8 @@ class ApiConfig {
   static const String login = '/auth/login';
   static const String userInfo = '/auth/userinfo';
   static const String searchUser = '/auth/search';
+  static const String sendEmailCode = '/auth/email/send-code';
+  static const String verifyEmailCode = '/auth/email/verify-code';
 
   // 聊天相关接口
   static const String conversationList = '/chat/conversations';
@@ -19,6 +21,7 @@ class ApiConfig {
   static const String friendApply = '/friends/apply';
   static const String friendApplyReceived = '/friends/apply/received';
   static const String friendApplyHandle = '/friends/apply/handle';
+  static String friendDelete(String id) => '/friends/$id';
 
   // 群组相关接口
   static const String groupCreate = '/group/create';

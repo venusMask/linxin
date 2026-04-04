@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:logger/logger.dart';
 import 'package:path_provider/path_provider.dart';
+import '../config/test_config.dart';
 
 class LogService {
   static final LogService _instance = LogService._internal();
@@ -19,7 +20,7 @@ class LogService {
         lineLength: 120,
         colors: true,
         printEmojis: true,
-        printTime: true,
+        dateTimeFormat: DateTimeFormat.onlyTimeAndSinceStart,
       ),
       output: MultiOutput([
         ConsoleOutput(),
@@ -29,6 +30,11 @@ class LogService {
   }
 
   Future<void> init() async {
+    if (TestConfig.isWeb) {
+      i('LogService: Running on Web, skipping file init.');
+      return;
+    }
+    
     try {
       final docDir = await getApplicationDocumentsDirectory();
       _logDir = Directory('${docDir.path}/logs');
@@ -36,7 +42,8 @@ class LogService {
         await _logDir!.create(recursive: true);
       }
       
-      _logFile = File('${_logDir!.path}/lin_xin.log');
+      final logName = 'lin_xin${TestConfig.suffix}.log';
+      _logFile = File('${_logDir!.path}/$logName');
       if (!await _logFile!.exists()) {
         await _logFile!.create();
       }
@@ -46,7 +53,7 @@ class LogService {
       
       i('日志服务已初始化，基础路径: ${_logFile!.path}');
     } catch (e) {
-      print('初始化日志文件错误: $e');
+      _logger.e('初始化日志文件错误: $e');
     }
   }
 
@@ -75,16 +82,18 @@ class LogService {
       }
       nextNumber = maxNum + 1;
       
-      final newPath = '${_logDir!.path}/lin_xin_$nextNumber.log';
+      final logName = 'lin_xin${TestConfig.suffix}_$nextNumber.log';
+      final newPath = '${_logDir!.path}/$logName';
       await _logFile!.rename(newPath);
       
       // 创建新的活跃日志文件
-      _logFile = File('${_logDir!.path}/lin_xin.log');
+      final activeLogName = 'lin_xin${TestConfig.suffix}.log';
+      _logFile = File('${_logDir!.path}/$activeLogName');
       await _logFile!.create();
       
-      i('日志已滚动，旧文件重命名为: lin_xin_$nextNumber.log');
+      i('日志已滚动，旧文件重命名为: $logName');
     } catch (e) {
-      print('执行日志滚动失败: $e');
+      _logger.e('执行日志滚动失败: $e');
     }
   }
 

@@ -28,4 +28,6 @@ public interface IChatService {
     Message sendGroupMessage(Long senderId, SendMessageRequest request);
 
     IPage<MessageVO> getGroupMessageList(Long groupId, Long userId, Integer pageNum, Integer pageSize);
+
+    java.util.List<MessageVO> syncMessages(Long userId, Long lastSequenceId);
 }

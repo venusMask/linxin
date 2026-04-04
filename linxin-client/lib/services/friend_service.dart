@@ -33,4 +33,8 @@ class FriendService {
   Future<void> handleFriendApply(dynamic applyId, int status) async {
     await _httpService.handleFriendApply(applyId, status);
   }
+
+  Future<void> deleteFriend(String friendId) async {
+    await _httpService.delete('/friends/$friendId');
+  }
 }

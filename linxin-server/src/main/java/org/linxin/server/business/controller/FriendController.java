@@ -27,8 +27,11 @@ public class FriendController {
 
     @PostMapping("/list")
     @Operation(summary = "获取好友列表")
-    public Result<IPage<FriendVO>> getFriendList(@RequestBody FriendListRequest request) {
+    public Result<IPage<FriendVO>> getFriendList(
+            @RequestAttribute("userId") Long userId,
+            @RequestBody FriendListRequest request) {
         IPage<FriendVO> friends = friendService.getFriendList(
+                userId,
                 request.getUsername(), 
                 request.getPageNum(), 
                 request.getPageSize()

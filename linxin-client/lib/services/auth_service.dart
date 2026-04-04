@@ -5,6 +5,7 @@ import '../models/user.dart';
 import 'http_service.dart';
 import 'websocket_service.dart';
 import 'db_service.dart';
+import '../config/test_config.dart';
 
 class AuthService extends ChangeNotifier {
   static final AuthService _instance = AuthService._internal();
@@ -27,10 +28,11 @@ class AuthService extends ChangeNotifier {
 
   Future<void> initialize() async {
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('auth_token');
-    final userId = prefs.getString('auth_user_id');
-    final username = prefs.getString('auth_username');
-    final nickname = prefs.getString('auth_nickname');
+    final prefix = TestConfig.storagePrefix;
+    final token = prefs.getString('${prefix}auth_token');
+    final userId = prefs.getString('${prefix}auth_user_id');
+    final username = prefs.getString('${prefix}auth_username');
+    final nickname = prefs.getString('${prefix}auth_nickname');
 
     if (token != null && userId != null) {
       _httpService.setToken(token);
@@ -59,6 +61,33 @@ class AuthService extends ChangeNotifier {
       },
     );
     return User.fromJson(response.data);
+  }
+
+  Future<bool> sendEmailVerificationCode(String email) async {
+    try {
+      await _httpService.post(
+        ApiConfig.sendEmailCode,
+        data: {'email': email},
+      );
+      return true;
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<bool> verifyEmailCode(String email, String code) async {
+    try {
+      await _httpService.post(
+        ApiConfig.verifyEmailCode,
+        data: {
+          'email': email,
+          'code': code,
+        },
+      );
+      return true;
+    } catch (e) {
+      rethrow;
+    }
   }
 
   Future<User?> login({
@@ -94,18 +123,20 @@ class AuthService extends ChangeNotifier {
 
   Future<void> _persistAuthData(String token, int userId, String username, String nickname) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('auth_token', token);
-    await prefs.setString('auth_user_id', userId.toString());
-    await prefs.setString('auth_username', username);
-    await prefs.setString('auth_nickname', nickname);
+    final prefix = TestConfig.storagePrefix;
+    await prefs.setString('${prefix}auth_token', token);
+    await prefs.setString('${prefix}auth_user_id', userId.toString());
+    await prefs.setString('${prefix}auth_username', username);
+    await prefs.setString('${prefix}auth_nickname', nickname);
   }
 
   Future<void> _clearAuthData() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('auth_token');
-    await prefs.remove('auth_user_id');
-    await prefs.remove('auth_username');
-    await prefs.remove('auth_nickname');
+    final prefix = TestConfig.storagePrefix;
+    await prefs.remove('${prefix}auth_token');
+    await prefs.remove('${prefix}auth_user_id');
+    await prefs.remove('${prefix}auth_username');
+    await prefs.remove('${prefix}auth_nickname');
   }
 
   Future<void> logout() async {
@@ -113,7 +144,9 @@ class AuthService extends ChangeNotifier {
     _httpService.clearToken();
     WebSocketService().disconnect();
     await _clearAuthData();
-    await DatabaseService().clearUserData();
+    if (!TestConfig.isWeb) {
+      await DatabaseService().clearUserData();
+    }
     notifyListeners();
   }
 

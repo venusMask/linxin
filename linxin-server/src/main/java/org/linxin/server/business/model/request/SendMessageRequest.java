@@ -6,6 +6,8 @@ import lombok.Data;
 public class SendMessageRequest {
     private Long receiverId;
 
+    private Long conversationId;
+
     private Integer messageType;
 
     private String content;

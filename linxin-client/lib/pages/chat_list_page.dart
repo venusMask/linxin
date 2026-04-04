@@ -1,9 +1,7 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/chat.dart';
 import '../services/data_service.dart';
-import '../services/websocket_service.dart';
 import '../widgets/avatar_widget.dart';
 import 'ai_chat_page.dart';
 import 'chat_detail_page.dart';
@@ -17,31 +15,8 @@ class ChatListPage extends StatefulWidget {
 }
 
 class _ChatListPageState extends State<ChatListPage> {
-  final WebSocketService _webSocketService = WebSocketService();
-  StreamSubscription<dynamic>? _messageSubscription;
-  StreamSubscription<dynamic>? _groupMessageSubscription;
-
-  @override
-  void initState() {
-    super.initState();
-    _initWebSocketListeners();
-  }
-
-  void _initWebSocketListeners() {
-    final dataService = context.read<DataService>();
-    _messageSubscription = _webSocketService.messageStream.listen((data) {
-      _handleWebSocketMessage(data, dataService);
-    });
-
-    _groupMessageSubscription = _webSocketService.groupMessageStream.listen((data) {
-      _handleGroupWebSocketMessage(data, dataService);
-    });
-  }
-
   @override
   void dispose() {
-    _messageSubscription?.cancel();
-    _groupMessageSubscription?.cancel();
     super.dispose();
   }
 
@@ -60,41 +35,6 @@ class _ChatListPageState extends State<ChatListPage> {
     } else {
       return '${time.month}/${time.day}';
     }
-  }
-
-  void _handleWebSocketMessage(dynamic data, DataService dataService) {
-    if (data['type'] == 'new_message') {
-      _updateChatFromMessage(data['data'], dataService);
-    } else if (data['type'] == 'read_status') {
-      final messageData = data['data'];
-      final conversationId = messageData['conversationId']?.toString();
-      if (conversationId != null) {
-        dataService.markAsRead(conversationId);
-      }
-    }
-  }
-
-  void _handleGroupWebSocketMessage(dynamic data, DataService dataService) {
-    if (data['type'] == 'group_message') {
-      _updateChatFromMessage(data['data'], dataService);
-    }
-  }
-
-  void _updateChatFromMessage(dynamic messageData, DataService dataService) {
-    if (!mounted) return;
-    final conversationId = messageData['conversationId']?.toString();
-    if (conversationId == null) return;
-    
-    final chat = dataService.getChatById(conversationId);
-    if (chat == null) {
-      return;
-    }
-
-    dataService.addMessage(
-      conversationId, 
-      messageData['content']?.toString() ?? '', 
-      DateTime.now()
-    );
   }
 
   void _createGroup() async {
@@ -176,7 +116,7 @@ class _ChatListPageState extends State<ChatListPage> {
 
   Widget _buildChatItem(Chat chat, BuildContext context) {
     final isGroup = chat.type == ChatType.group;
-    final avatarTag = isGroup ? 'group_avatar_${chat.id}' : 'avatar_${chat.friend?.id ?? chat.id}';
+    final avatarTag = isGroup ? 'chat_group_avatar_${chat.id}' : 'chat_avatar_${chat.friend?.id ?? chat.id}';
     final dataService = context.read<DataService>();
 
     return InkWell(

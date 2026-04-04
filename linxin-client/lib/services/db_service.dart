@@ -1,9 +1,10 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import '../config/test_config.dart';
+import 'log_service.dart';
 
 class DatabaseService {
   static Database? _database;
-  static const String _dbName = 'lin_xin.db';
   static const int _dbVersion = 1;
 
   Future<Database> get database async {
@@ -13,8 +14,17 @@ class DatabaseService {
   }
 
   Future<Database> _initDatabase() async {
+    if (TestConfig.isWeb) {
+      LogService.warn('DatabaseService: SQLite is not supported on Web. Database operations will fail.');
+      // 这里如果直接返回 null 可能会导致后续调用崩溃，但在 Web 端目前暂不考虑离线存储
+      throw UnsupportedError('SQLite is not supported on Web');
+    }
+
     final dbPath = await getDatabasesPath();
-    final path = join(dbPath, _dbName);
+    final dbName = 'lin_xin${TestConfig.suffix}.db';
+    final path = join(dbPath, dbName);
+
+    LogService.info('Initializing database at: $path');
 
     return await openDatabase(
       path,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import '../services/auth_service.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -14,10 +15,15 @@ class _RegisterPageState extends State<RegisterPage> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _nicknameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _verificationCodeController = TextEditingController();
   final _authService = AuthService();
 
   bool _isLoading = false;
+  bool _isSendingCode = false;
   String? _errorMessage;
+  int _countdown = 0;
+  bool _emailVerified = false;
 
   @override
   void dispose() {
@@ -25,11 +31,134 @@ class _RegisterPageState extends State<RegisterPage> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _nicknameController.dispose();
+    _emailController.dispose();
+    _verificationCodeController.dispose();
     super.dispose();
+  }
+
+  Future<void> _sendVerificationCode() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty) {
+      setState(() {
+        _errorMessage = '请输入邮箱地址';
+      });
+      return;
+    }
+
+    if (!_isValidEmail(email)) {
+      setState(() {
+        _errorMessage = '请输入有效的邮箱地址';
+      });
+      return;
+    }
+
+    setState(() {
+      _isSendingCode = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await _authService.sendEmailVerificationCode(email);
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('验证码已发送到您的邮箱'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        
+        _startCountdown();
+      }
+    } catch (e) {
+      String message = e.toString().replaceAll('Exception: ', '');
+      setState(() {
+        _errorMessage = '发送验证码失败: ${message.split(':').last.trim()}';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSendingCode = false;
+        });
+      }
+    }
+  }
+
+  void _startCountdown() {
+    setState(() {
+      _countdown = 60;
+    });
+
+    Future.doWhile(() async {
+      await Future.delayed(const Duration(seconds: 1));
+      if (!mounted) return false;
+      
+      setState(() {
+        _countdown--;
+      });
+      
+      return _countdown > 0;
+    });
+  }
+
+  bool _isValidEmail(String email) {
+    return RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(email);
+  }
+
+  Future<void> _verifyEmail() async {
+    final email = _emailController.text.trim();
+    final code = _verificationCodeController.text.trim();
+
+    if (email.isEmpty || code.isEmpty) {
+      setState(() {
+        _errorMessage = '请输入邮箱和验证码';
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      await _authService.verifyEmailCode(email, code);
+      
+      if (mounted) {
+        setState(() {
+          _emailVerified = true;
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('邮箱验证成功'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      String message = e.toString().replaceAll('Exception: ', '');
+      setState(() {
+        _errorMessage = '验证失败: ${message.split(':').last.trim()}';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) {
+      return;
+    }
+
+    if (!_emailVerified) {
+      setState(() {
+        _errorMessage = '请先验证邮箱';
+      });
       return;
     }
 
@@ -48,21 +177,19 @@ class _RegisterPageState extends State<RegisterPage> {
       );
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('注册成功，请登录'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        Navigator.of(context).pop();
+        SchedulerBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('注册成功，请登录'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          Navigator.of(context).pop();
+        });
       }
     } catch (e) {
       String message = e.toString().replaceAll('Exception: ', '');
-      // 如果是 DioException，尝试提取我们封装好的 clean message
-      if (message.contains('DioException')) {
-        // 这里的处理方式取决于 toString() 的输出，但通常直接提取 message 更靠谱
-        // 考虑到用户不想看到 DioException 字样，我们直接格式化
-      }
       setState(() {
         _errorMessage = '注册失败: ${message.split(':').last.trim()}';
       });
@@ -140,6 +267,121 @@ class _RegisterPageState extends State<RegisterPage> {
                     ),
                   ),
                 if (_errorMessage != null) const SizedBox(height: 16),
+                Text(
+                  '邮箱验证',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green[600],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _emailController,
+                        decoration: const InputDecoration(
+                          labelText: '邮箱地址',
+                          hintText: '请输入邮箱地址',
+                          prefixIcon: Icon(Icons.email),
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return '请输入邮箱地址';
+                          }
+                          if (!_isValidEmail(value.trim())) {
+                            return '请输入有效的邮箱地址';
+                          }
+                          return null;
+                        },
+                        enabled: !_isLoading && !_isSendingCode,
+                        keyboardType: TextInputType.emailAddress,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton(
+                      onPressed: (_isSendingCode || _countdown > 0)
+                          ? null
+                          : _sendVerificationCode,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green[600],
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 16,
+                        ),
+                      ),
+                      child: _isSendingCode
+                          ? const SizedBox(
+                              height: 16,
+                              width: 16,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor:
+                                    AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : Text(
+                              _countdown > 0 ? '${_countdown}s' : '发送验证码',
+                              style: const TextStyle(fontSize: 14),
+                            ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _verificationCodeController,
+                        decoration: const InputDecoration(
+                          labelText: '验证码',
+                          hintText: '请输入验证码',
+                          prefixIcon: Icon(Icons.verified_user),
+                          border: OutlineInputBorder(),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.trim().isEmpty) {
+                            return '请输入验证码';
+                          }
+                          return null;
+                        },
+                        enabled: !_isLoading && !_isSendingCode,
+                        keyboardType: TextInputType.number,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    ElevatedButton(
+                      onPressed: _isLoading
+                          ? null
+                          : _verifyEmail,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _emailVerified ? Colors.grey : Colors.green[600],
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 16,
+                        ),
+                      ),
+                      child: Text(
+                        _emailVerified ? '已验证' : '验证邮箱',
+                        style: const TextStyle(fontSize: 14),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  '账号信息',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green[600],
+                  ),
+                ),
+                const SizedBox(height: 12),
                 TextFormField(
                   controller: _usernameController,
                   decoration: const InputDecoration(

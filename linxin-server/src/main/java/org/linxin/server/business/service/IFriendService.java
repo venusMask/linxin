@@ -1,30 +1,32 @@
 package org.linxin.server.business.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
-import org.linxin.server.business.entity.FriendApply;
+import com.baomidou.mybatisplus.extension.service.IService;
 import org.linxin.server.business.model.request.FriendApplyRequest;
 import org.linxin.server.business.model.request.FriendHandleRequest;
 import org.linxin.server.business.model.request.FriendUpdateRequest;
+import org.linxin.server.business.entity.Friend;
 import org.linxin.server.business.vo.FriendApplyVO;
 import org.linxin.server.business.vo.FriendVO;
 
 import java.util.List;
 
-public interface IFriendService {
+public interface IFriendService extends IService<Friend> {
+    IPage<FriendVO> getFriendList(Long userId, String keyword, Integer pageNum, Integer pageSize);
 
-    IPage<FriendVO> getFriendList(String username, Integer pageNum, Integer pageSize);
-
-    FriendApply applyAddFriend(Long fromUserId, FriendApplyRequest request);
+    void applyAddFriend(Long userId, FriendApplyRequest request);
 
     List<FriendApplyVO> getReceivedApplyList(Long userId);
 
     List<FriendApplyVO> getSentApplyList(Long userId);
 
-    void handleFriendApply(Long toUserId, FriendHandleRequest request);
+    void handleFriendApply(Long userId, FriendHandleRequest request);
 
     void deleteFriend(Long userId, Long friendId);
 
     void updateFriend(Long userId, FriendUpdateRequest request);
 
     boolean isFriend(Long userId, Long friendId);
+
+    List<Friend> resolveRecipient(Long userId, String recipientName);
 }

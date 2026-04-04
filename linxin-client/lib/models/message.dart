@@ -13,6 +13,9 @@ class Message {
   final DateTime? time;
   final String? groupId;
   final int conversationType;
+  final int? sequenceId;
+  final String? senderType; // Agent 名称，如 OpenClaw
+  final bool isAi;          // 是否由 AI 发送
 
   Message({
     required this.id,
@@ -29,9 +32,13 @@ class Message {
     this.time,
     this.groupId,
     this.conversationType = 0,
+    this.sequenceId,
+    this.senderType,
+    this.isAi = false,
   });
 
   bool get isGroupMessage => conversationType == 1 || groupId != null;
+  bool get isFromAgent => isAi;
 
   Message copyWith({
     String? id,
@@ -48,6 +55,9 @@ class Message {
     DateTime? time,
     String? groupId,
     int? conversationType,
+    int? sequenceId,
+    String? senderType,
+    bool? isAi,
   }) {
     return Message(
       id: id ?? this.id,
@@ -64,6 +74,9 @@ class Message {
       time: time ?? this.time,
       groupId: groupId ?? this.groupId,
       conversationType: conversationType ?? this.conversationType,
+      sequenceId: sequenceId ?? this.sequenceId,
+      senderType: senderType ?? this.senderType,
+      isAi: isAi ?? this.isAi,
     );
   }
 
@@ -82,17 +95,20 @@ class Message {
       'isMe': isMe,
       'groupId': groupId,
       'conversationType': conversationType,
+      'sequenceId': sequenceId,
+      'senderType': senderType,
+      'isAi': isAi,
     };
   }
 
   factory Message.fromJson(Map<String, dynamic> json) {
     return Message(
-      id: json['id'] as String,
-      conversationId: json['conversationId'] as String? ?? json['conversation_id'] as String? ?? '',
-      senderId: json['senderId'] as String? ?? json['sender_id'] as String? ?? '',
+      id: json['id']?.toString() ?? '',
+      conversationId: json['conversationId']?.toString() ?? json['conversation_id']?.toString() ?? '',
+      senderId: json['senderId']?.toString() ?? json['sender_id']?.toString() ?? '',
       senderNickname: json['senderNickname'] as String? ?? json['sender_nickname'] as String?,
       senderAvatar: json['senderAvatar'] as String? ?? json['sender_avatar'] as String?,
-      content: json['content'] as String,
+      content: json['content'] as String? ?? '',
       messageType: json['messageType'] as int? ?? json['message_type'] as int? ?? 1,
       status: json['status'] as int? ?? 1,
       createdAt: json['createdAt'] != null
@@ -100,22 +116,25 @@ class Message {
           : json['created_at'] != null
               ? DateTime.parse(json['created_at'] as String)
               : DateTime.now(),
-      isRead: json['isRead'] as bool? ?? json['is_read'] == 1 ?? false,
+      isRead: json['isRead'] as bool? ?? json['is_read'] == 1,
       isMe: json['isMe'] as bool? ?? json['is_me'] as bool? ?? false,
       time: json['time'] != null ? DateTime.parse(json['time'] as String) : null,
       groupId: json['groupId']?.toString(),
       conversationType: json['conversationType'] as int? ?? 0,
+      sequenceId: json['sequenceId'] as int? ?? json['sequence_id'] as int?,
+      senderType: json['senderType'] as String? ?? json['sender_type'] as String?,
+      isAi: json['isAi'] as bool? ?? json['is_ai'] as bool? ?? false,
     );
   }
 
   factory Message.fromServerJson(Map<String, dynamic> json) {
     return Message(
-      id: json['id'] as String,
-      conversationId: json['conversationId'] as String? ?? json['conversation_id'] as String? ?? '',
-      senderId: json['senderId'] as String? ?? json['sender_id'] as String? ?? '',
+      id: json['id']?.toString() ?? '',
+      conversationId: json['conversationId']?.toString() ?? json['conversation_id']?.toString() ?? '',
+      senderId: json['senderId']?.toString() ?? json['sender_id']?.toString() ?? '',
       senderNickname: json['senderNickname'] as String? ?? json['sender_nickname'] as String?,
       senderAvatar: json['senderAvatar'] as String? ?? json['sender_avatar'] as String?,
-      content: json['content'] as String,
+      content: json['content'] as String? ?? '',
       messageType: json['messageType'] as int? ?? json['message_type'] as int? ?? 1,
       status: json['status'] as int? ?? 1,
       createdAt: json['createdAt'] != null
@@ -123,10 +142,13 @@ class Message {
           : json['created_at'] != null
               ? DateTime.parse(json['created_at'] as String)
               : DateTime.now(),
-      isRead: json['isRead'] as bool? ?? json['is_read'] == 1 ?? false,
+      isRead: json['isRead'] as bool? ?? json['is_read'] == 1,
       isMe: json['isMe'] as bool? ?? json['is_me'] as bool? ?? false,
       groupId: json['groupId']?.toString(),
       conversationType: json['conversationType'] as int? ?? 0,
+      sequenceId: json['sequenceId'] as int? ?? json['sequence_id'] as int?,
+      senderType: json['senderType'] as String? ?? json['sender_type'] as String?,
+      isAi: json['isAi'] as bool? ?? json['is_ai'] as bool? ?? false,
     );
   }
 }

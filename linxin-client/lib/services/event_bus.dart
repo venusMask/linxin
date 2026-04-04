@@ -39,6 +39,22 @@ class MessageSentEvent extends Event {
   });
 }
 
+class MessageReceivedEvent extends Event {
+  final String conversationId;
+  final String messageId;
+  final String content;
+  final String senderId;
+  final DateTime createdAt;
+
+  MessageReceivedEvent({
+    required this.conversationId,
+    required this.messageId,
+    required this.content,
+    required this.senderId,
+    required this.createdAt,
+  });
+}
+
 class FriendAppliedEvent extends Event {
   final String targetUserId;
   final String remark;

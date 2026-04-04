@@ -14,6 +14,8 @@ import org.linxin.server.business.vo.ConversationVO;
 import org.linxin.server.business.vo.MessageVO;
 import org.linxin.server.common.result.Result;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/chat")
 @RequiredArgsConstructor
@@ -102,5 +104,14 @@ public class ChatController {
             @PathVariable Long conversationId) {
         chatService.toggleMute(userId, conversationId);
         return Result.success("操作成功");
+    }
+
+    @GetMapping("/sync")
+    @Operation(summary = "增量同步消息接口")
+    public Result<List<MessageVO>> syncMessages(
+            @RequestAttribute("userId") Long userId,
+            @RequestParam(required = false, defaultValue = "0") Long lastSequenceId) {
+        List<MessageVO> messages = chatService.syncMessages(userId, lastSequenceId);
+        return Result.success(messages);
     }
 }

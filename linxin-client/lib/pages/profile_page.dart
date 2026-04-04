@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../widgets/avatar_widget.dart';
+import 'agent_token_page.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -71,9 +72,9 @@ class ProfilePage extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      '账号: ${user?.username ?? ""}',
+                      '灵信号: ${user?.username ?? ""}',
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.8),
+                        color: Colors.white.withValues(alpha: 0.8),
                         fontSize: 14,
                       ),
                     ),
@@ -86,6 +87,12 @@ class ProfilePage extends StatelessWidget {
             delegate: SliverChildListDelegate([
               const SizedBox(height: 12),
               _buildMenuItem(Icons.person_outline, '个人信息', () {}),
+              _buildMenuItem(Icons.smart_toy_outlined, 'Agent 开放平台', () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const AgentTokenPage()),
+                );
+              }),
               _buildMenuItem(Icons.security, '账号安全', () {}),
               _buildMenuItem(Icons.settings_outlined, '通用设置', () {}),
               const SizedBox(height: 24),

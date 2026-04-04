@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:provider/provider.dart';
 import '../services/http_service.dart';
-import '../services/data_service.dart';
 import '../models/user.dart';
 import '../models/friend.dart';
-import '../config/api_config.dart';
 import '../widgets/avatar_widget.dart';
-import '../services/auth_service.dart';
+import '../services/data_service.dart';
 import 'friend_apply_list_page.dart';
 import 'user_search_result_page.dart';
 import 'user_details_page.dart';
@@ -18,46 +18,19 @@ class FriendListPage extends StatefulWidget {
 }
 
 class _FriendListPageState extends State<FriendListPage> {
-  final DataService _dataService = DataService();
   final HttpService _httpService = HttpService();
-  List<Friend> _friends = [];
 
   @override
   void initState() {
     super.initState();
-    _loadFriends();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final dataService = context.read<DataService>();
+      dataService.refreshFriends();
+      dataService.refreshPendingApplyCount();
+    });
   }
 
-  void _loadFriends() async {
-    try {
-      final response = await _httpService.post(
-        ApiConfig.friendList,
-        data: {
-          'username': AuthService().currentUser?.username,
-          'pageNum': 1,
-          'pageSize': 100, // 获取全部好友或较多数量
-        },
-      );
-      // 后端返回的是 IPage<FriendVO>，结构为 {records: [...], total: ...}
-      final List<dynamic> records = response.data['records'] ?? [];
-      
-      if (mounted) {
-        setState(() {
-          _friends = records.map((json) => Friend(
-            id: json['friendId']?.toString() ?? '',
-            name: json['friendNickname'] ?? json['nickname'] ?? '未知用户',
-            avatar: json['avatar'] ?? '',
-          )).toList();
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('加载好友列表失败: $e')),
-        );
-      }
-    }
-  }
+  // _loadFriends removed as it is now moved to DataService
 
   void _showSearchDialog() {
     final TextEditingController searchController = TextEditingController();
@@ -85,7 +58,10 @@ class _FriendListPageState extends State<FriendListPage> {
               
               try {
                 final results = await _httpService.searchUsers(keyword);
-                if (mounted) {
+                if (!mounted) return;
+                
+                SchedulerBinding.instance.addPostFrameCallback((_) {
+                  if (!mounted) return;
                   Navigator.pop(context); // 关闭弹窗
                   if (results.isNotEmpty) {
                     final user = User.fromJson(results.first);
@@ -100,13 +76,16 @@ class _FriendListPageState extends State<FriendListPage> {
                       const SnackBar(content: Text('用户不存在')),
                     );
                   }
-                }
+                });
               } catch (e) {
-                if (mounted) {
+                if (!mounted) return;
+                
+                SchedulerBinding.instance.addPostFrameCallback((_) {
+                  if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('搜索失败: $e')),
                   );
-                }
+                });
               }
             },
             child: const Text('搜索'),
@@ -118,6 +97,9 @@ class _FriendListPageState extends State<FriendListPage> {
 
   @override
   Widget build(BuildContext context) {
+    final dataService = context.watch<DataService>();
+    final friends = dataService.friends;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -137,28 +119,57 @@ class _FriendListPageState extends State<FriendListPage> {
         centerTitle: true,
       ),
       body: ListView.builder(
-        itemCount: _friends.length + 1, // +1 for "New Friends"
+        itemCount: friends.length + 1, // +1 for "New Friends"
         itemBuilder: (context, index) {
           if (index == 0) {
-            return _buildNewFriendItem();
+            return _buildNewFriendItem(dataService.pendingApplyCount);
           }
-          final friend = _friends[index - 1];
+          final friend = friends[index - 1];
           return _buildFriendItem(friend);
         },
       ),
     );
   }
 
-  Widget _buildNewFriendItem() {
+  Widget _buildNewFriendItem(int pendingCount) {
     return ListTile(
-      leading: Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          color: Colors.orange[400],
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: const Icon(Icons.person_add, color: Colors.white),
+      leading: Stack(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: Colors.orange[400],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.person_add, color: Colors.white),
+          ),
+          if (pendingCount > 0)
+            Positioned(
+              right: 0,
+              top: 0,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(
+                  color: Colors.red,
+                  shape: BoxShape.circle,
+                ),
+                constraints: const BoxConstraints(
+                  minWidth: 16,
+                  minHeight: 16,
+                ),
+                child: Text(
+                  pendingCount > 99 ? '99+' : '$pendingCount',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+        ],
       ),
       title: const Text(
         '新的朋友',
@@ -178,20 +189,20 @@ class _FriendListPageState extends State<FriendListPage> {
   Widget _buildFriendItem(Friend friend) {
     return InkWell(
       onTap: () async {
+        final heroTag = 'friend_avatar_${friend.id}';
         await Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => UserDetailsPage(friend: friend),
+            builder: (context) => UserDetailsPage(friend: friend, heroTag: heroTag),
           ),
         );
-        _loadFriends();
       },
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
           children: [
             Hero(
-              tag: 'avatar_${friend.id}',
+              tag: 'friend_avatar_${friend.id}',
               child: AvatarWidget(
                 imageUrl: friend.avatar,
                 name: friend.name,

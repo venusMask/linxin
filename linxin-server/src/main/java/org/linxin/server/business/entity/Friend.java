@@ -18,6 +18,8 @@ public class Friend {
     private String friendNickname;
     
     private String friendGroup;
+
+    private String tags;
     
     private Integer status;
     

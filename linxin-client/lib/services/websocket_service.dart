@@ -16,11 +16,13 @@ class WebSocketService {
 
   final _messageController = StreamController<dynamic>.broadcast();
   final _groupMessageController = StreamController<dynamic>.broadcast();
+  final _friendEventController = StreamController<dynamic>.broadcast();
   final _connectController = StreamController<void>.broadcast();
   final _disconnectController = StreamController<void>.broadcast();
 
   Stream<dynamic> get messageStream => _messageController.stream;
   Stream<dynamic> get groupMessageStream => _groupMessageController.stream;
+  Stream<dynamic> get friendEventStream => _friendEventController.stream;
   Stream<void> get connectStream => _connectController.stream;
   Stream<void> get disconnectStream => _disconnectController.stream;
 
@@ -53,6 +55,8 @@ class WebSocketService {
             final type = jsonData['type'] as String?;
             if (type == 'group_message') {
               _groupMessageController.add(jsonData);
+            } else if (type == 'friend_apply' || type == 'friend_handle' || type == 'friend_delete') {
+              _friendEventController.add(jsonData);
             } else {
               _messageController.add(jsonData);
             }
@@ -157,6 +161,7 @@ class WebSocketService {
     disconnect();
     _messageController.close();
     _groupMessageController.close();
+    _friendEventController.close();
     _connectController.close();
     _disconnectController.close();
   }

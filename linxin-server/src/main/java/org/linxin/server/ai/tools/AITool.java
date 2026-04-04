@@ -6,6 +6,7 @@ import java.util.List;
 @Data
 public class AITool {
     private String id;
+    private boolean implemented;
     private String name;
     private String description;
     private String icon;

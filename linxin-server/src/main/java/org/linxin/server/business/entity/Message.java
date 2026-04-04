@@ -28,6 +28,12 @@ public class Message {
     private Integer sendStatus;
     
     private LocalDateTime sendTime;
+
+    private Long sequenceId;
+
+    private String senderType;
+
+    private Boolean isAi;
     
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;

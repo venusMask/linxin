@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import '../models/group.dart';
 import '../models/group_member.dart';
 import '../services/group_service.dart';
@@ -83,18 +84,24 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
                   groupId: widget.group.id,
                   announcement: controller.text,
                 );
-                if (mounted) {
+                if (!mounted) return;
+                
+                SchedulerBinding.instance.addPostFrameCallback((_) {
+                  if (!mounted) return;
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('群公告已更新')),
                   );
-                }
+                });
               } catch (e) {
-                if (mounted) {
+                if (!mounted) return;
+                
+                SchedulerBinding.instance.addPostFrameCallback((_) {
+                  if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('更新失败: $e')),
                   );
-                }
+                });
               }
             },
             child: const Text('保存'),
@@ -131,19 +138,25 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
                   groupId: widget.group.id,
                   memberId: member.userId,
                 );
-                if (mounted) {
+                if (!mounted) return;
+                
+                SchedulerBinding.instance.addPostFrameCallback((_) {
+                  if (!mounted) return;
                   Navigator.pop(context);
                   _loadMembers();
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('成员已移除')),
                   );
-                }
+                });
               } catch (e) {
-                if (mounted) {
+                if (!mounted) return;
+                
+                SchedulerBinding.instance.addPostFrameCallback((_) {
+                  if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('移除失败: $e')),
                   );
-                }
+                });
               }
             },
             child: const Text('确定'),
@@ -168,19 +181,25 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
             onPressed: () async {
               try {
                 await _groupService.leaveGroup(widget.group.id);
-                if (mounted) {
+                if (!mounted) return;
+                
+                SchedulerBinding.instance.addPostFrameCallback((_) {
+                  if (!mounted) return;
                   Navigator.pop(context);
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('已退出群聊')),
                   );
-                }
+                });
               } catch (e) {
-                if (mounted) {
+                if (!mounted) return;
+                
+                SchedulerBinding.instance.addPostFrameCallback((_) {
+                  if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('退出失败: $e')),
                   );
-                }
+                });
               }
             },
             child: const Text('确定'),
@@ -205,19 +224,25 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
             onPressed: () async {
               try {
                 await _groupService.dissolveGroup(widget.group.id);
-                if (mounted) {
+                if (!mounted) return;
+                
+                SchedulerBinding.instance.addPostFrameCallback((_) {
+                  if (!mounted) return;
                   Navigator.pop(context);
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('群聊已解散')),
                   );
-                }
+                });
               } catch (e) {
-                if (mounted) {
+                if (!mounted) return;
+                
+                SchedulerBinding.instance.addPostFrameCallback((_) {
+                  if (!mounted) return;
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('解散失败: $e')),
                   );
-                }
+                });
               }
             },
             child: const Text('确定'),
@@ -480,18 +505,24 @@ class _AddGroupMembersPageState extends State<AddGroupMembersPage> {
                         groupId: widget.groupId,
                         memberIds: _selectedIds.toList(),
                       );
-                      if (mounted) {
+                      if (!mounted) return;
+                      
+                      SchedulerBinding.instance.addPostFrameCallback((_) {
+                        if (!mounted) return;
                         Navigator.pop(context);
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(content: Text('成员已添加')),
                         );
-                      }
+                      });
                     } catch (e) {
-                      if (mounted) {
+                      if (!mounted) return;
+                      
+                      SchedulerBinding.instance.addPostFrameCallback((_) {
+                        if (!mounted) return;
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(content: Text('添加失败: $e')),
                         );
-                      }
+                      });
                     }
                   },
             child: Text(

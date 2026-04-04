@@ -4,11 +4,11 @@
     <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
     <springProfile name="dev,test">
         <property name="LOG_PATH" value="./logs"/>
-        <property name="LOG_FILE" value="${LOG_PATH}/lin-xin-mgr"/>
+        <property name="LOG_FILE" value="${LOG_PATH}/linxin-server"/>
     </springProfile>
     <springProfile name="prod">
-        <property name="LOG_PATH" value="/var/log/lin-xin-mgr"/>
-        <property name="LOG_FILE" value="${LOG_PATH}/lin-xin-mgr"/>
+        <property name="LOG_PATH" value="/var/log/linxin-server"/>
+        <property name="LOG_FILE" value="${LOG_PATH}/linxin-server"/>
     </springProfile>
     <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>${LOG_FILE}.log</file>

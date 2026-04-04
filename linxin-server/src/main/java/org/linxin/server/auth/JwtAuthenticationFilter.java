@@ -21,6 +21,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final DPUserDetailLoginService userDetailsService;
+    private final org.linxin.server.business.service.IAgentTokenService agentTokenService;
+    private final org.linxin.server.business.mapper.UserMapper userMapper;
 
     @Override
     protected void doFilterInternal(
@@ -35,30 +37,45 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             return;
         }
 
-        String jwt = authHeader.substring(7);
+        String token = authHeader.substring(7);
+        
         try {
-            String username = jwtService.extractUsername(jwt);
-            Long userId = jwtService.extractUserId(jwt);
-
-            if (username != null && userId != null
-                    && SecurityContextHolder.getContext().getAuthentication() == null) {
-                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
-
-                if (userDetails.isEnabled()) {
-                    request.setAttribute("userId", userId);
-
-                    UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
-                            userDetails,
-                            null,
-                            userDetails.getAuthorities()
-                    );
-                    authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(authToken);
+            if (token.startsWith("lx_at_")) {
+                // 处理 Agent Token 鉴权
+                var agentToken = agentTokenService.validateToken(token);
+                if (agentToken != null) {
+                    var user = userMapper.selectById(agentToken.getUserId());
+                    if (user != null) {
+                        setAuthentication(request, user.getUsername(), user.getId());
+                    }
+                }
+            } else {
+                // 处理标准 JWT 鉴权
+                String username = jwtService.extractUsername(token);
+                Long userId = jwtService.extractUserId(token);
+                if (username != null && userId != null) {
+                    setAuthentication(request, username, userId);
                 }
             }
         } catch (Exception e) {
-            logger.error("JWT Authentication failed: " + e.getMessage());
+            logger.error("Authentication failed: " + e.getMessage());
         }
         filterChain.doFilter(request, response);
+    }
+
+    private void setAuthentication(HttpServletRequest request, String username, Long userId) {
+        if (SecurityContextHolder.getContext().getAuthentication() == null) {
+            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+            if (userDetails.isEnabled()) {
+                request.setAttribute("userId", userId);
+                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                        userDetails,
+                        null,
+                        userDetails.getAuthorities()
+                );
+                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                SecurityContextHolder.getContext().setAuthentication(authToken);
+            }
+        }
     }
 }

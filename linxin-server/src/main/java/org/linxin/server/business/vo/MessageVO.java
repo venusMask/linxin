@@ -22,4 +22,8 @@ public class MessageVO {
     private String extra;
     private Integer sendStatus;
     private LocalDateTime sendTime;
+
+    private Long sequenceId;
+    private Boolean isAi;
+    private String senderType;
 }

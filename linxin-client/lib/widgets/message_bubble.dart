@@ -32,7 +32,7 @@ class MessageBubble extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.04),
+              color: Colors.black.withValues(alpha: 0.04),
               blurRadius: 4,
               offset: const Offset(0, 2),
             ),
@@ -74,6 +74,22 @@ class MessageBubble extends StatelessWidget {
                     fontSize: 11,
                   ),
                 ),
+                if (message.isFromAgent) ...[
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.smart_toy_outlined,
+                    size: 12,
+                    color: isMe ? Colors.white70 : Colors.grey[500],
+                  ),
+                  const SizedBox(width: 2),
+                  Text(
+                    '来自 ${message.senderType ?? "Agent"} 辅助',
+                    style: TextStyle(
+                      color: isMe ? Colors.white70 : Colors.grey[500],
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
                 if (isMe) ...[
                   const SizedBox(width: 4),
                   _buildStatusIcon(status),
