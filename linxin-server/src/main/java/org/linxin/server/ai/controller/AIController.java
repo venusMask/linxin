@@ -1,15 +1,14 @@
 package org.linxin.server.ai.controller;
 
+import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
 import org.linxin.server.ai.dto.ChatRequest;
 import org.linxin.server.ai.dto.ChatResponse;
 import org.linxin.server.ai.dto.ModifyParamsRequest;
 import org.linxin.server.ai.service.AIService;
 import org.linxin.server.ai.tools.AITool;
 import org.linxin.server.common.result.Result;
-
-import java.util.List;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/ai")
@@ -28,8 +27,7 @@ public class AIController {
     public Result<ChatResponse> modifyParams(@RequestBody ModifyParamsRequest request) {
         ChatResponse response = aiService.modifyParams(
                 request.getOriginalResponse(),
-                request.getModification()
-        );
+                request.getModification());
         return Result.success(response);
     }
 

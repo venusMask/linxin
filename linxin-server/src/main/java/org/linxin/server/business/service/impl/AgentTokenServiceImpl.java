@@ -2,14 +2,13 @@ package org.linxin.server.business.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
 import org.linxin.server.business.entity.AgentToken;
 import org.linxin.server.business.mapper.AgentTokenMapper;
 import org.linxin.server.business.service.IAgentTokenService;
 import org.springframework.stereotype.Service;
-
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.UUID;
 
 @Service
 public class AgentTokenServiceImpl extends ServiceImpl<AgentTokenMapper, AgentToken> implements IAgentTokenService {
@@ -20,7 +19,8 @@ public class AgentTokenServiceImpl extends ServiceImpl<AgentTokenMapper, AgentTo
         agentToken.setUserId(userId);
         agentToken.setAgentName(agentName);
         agentToken.setScopes(scopes != null ? scopes : "msg:send");
-        agentToken.setToken("lx_at_" + UUID.randomUUID().toString().replace("-", "") + UUID.randomUUID().toString().replace("-", ""));
+        agentToken.setToken("lx_at_" + UUID.randomUUID().toString().replace("-", "")
+                + UUID.randomUUID().toString().replace("-", ""));
         agentToken.setStatus(1);
         agentToken.setExpireTime(expireTime);
         this.save(agentToken);
@@ -32,7 +32,7 @@ public class AgentTokenServiceImpl extends ServiceImpl<AgentTokenMapper, AgentTo
         LambdaQueryWrapper<AgentToken> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(AgentToken::getToken, token).eq(AgentToken::getStatus, 1);
         AgentToken agentToken = this.getOne(wrapper);
-        
+
         if (agentToken != null) {
             // 检查是否过期
             if (agentToken.getExpireTime() != null && agentToken.getExpireTime().isBefore(LocalDateTime.now())) {
@@ -42,7 +42,7 @@ public class AgentTokenServiceImpl extends ServiceImpl<AgentTokenMapper, AgentTo
             agentToken.setLastUsedTime(LocalDateTime.now());
             this.updateById(agentToken);
         }
-        
+
         return agentToken;
     }
 

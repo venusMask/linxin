@@ -1,5 +1,11 @@
 package org.linxin.server.ai.service.impl;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+import java.util.Collections;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -15,21 +21,19 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import java.util.Collections;
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
-
 @ExtendWith(MockitoExtension.class)
 public class AIServiceImplTest {
 
-    @Mock private AIConfig aiConfig;
-    @Mock private ToolsConfig toolsConfig;
-    @Mock private AIUsageLogMapper usageLogMapper;
-    @Mock private AIModelAdapter mockAdapter1;
-    @Mock private AIModelAdapter mockAdapter2;
+    @Mock
+    private AIConfig aiConfig;
+    @Mock
+    private ToolsConfig toolsConfig;
+    @Mock
+    private AIUsageLogMapper usageLogMapper;
+    @Mock
+    private AIModelAdapter mockAdapter1;
+    @Mock
+    private AIModelAdapter mockAdapter2;
 
     @InjectMocks
     private AIServiceImpl aiService;
@@ -39,7 +43,7 @@ public class AIServiceImplTest {
         // 创建一个 Failover 适配器，包含两个 Mock 适配器
         FailoverAIModelAdapter failoverAdapter = new FailoverAIModelAdapter(List.of(mockAdapter1, mockAdapter2));
         ReflectionTestUtils.setField(aiService, "activeAdapter", failoverAdapter);
-        
+
         when(toolsConfig.getTools()).thenReturn(Collections.emptyList());
     }
 
@@ -53,7 +57,7 @@ public class AIServiceImplTest {
         ChatResponse errorResponse = new ChatResponse();
         errorResponse.setIntent("error");
         errorResponse.setAiText("Quota exceeded");
-        
+
         when(mockAdapter1.chat(any(), any())).thenReturn(errorResponse);
         when(mockAdapter1.getProviderName()).thenReturn("Provider1");
 
@@ -74,7 +78,7 @@ public class AIServiceImplTest {
         assertNotNull(result);
         assertEquals("chat", result.getIntent());
         assertEquals("Success from Backup", result.getAiText());
-        
+
         // 验证是否调用了第二个适配器
         verify(mockAdapter2, times(1)).chat(any(), any());
     }

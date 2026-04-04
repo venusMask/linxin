@@ -1,11 +1,10 @@
 package org.linxin.server.business.service;
 
+import java.util.List;
 import org.linxin.server.business.model.request.AddGroupMembersRequest;
 import org.linxin.server.business.model.request.CreateGroupRequest;
 import org.linxin.server.business.vo.GroupMemberVO;
 import org.linxin.server.business.vo.GroupVO;
-
-import java.util.List;
 
 public interface IGroupService {
 

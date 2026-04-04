@@ -4,8 +4,8 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
 import org.linxin.server.business.entity.Conversation;
 import org.linxin.server.business.entity.Message;
 import org.linxin.server.business.model.request.SendMessageRequest;
@@ -13,8 +13,7 @@ import org.linxin.server.business.service.IChatService;
 import org.linxin.server.business.vo.ConversationVO;
 import org.linxin.server.business.vo.MessageVO;
 import org.linxin.server.common.result.Result;
-
-import java.util.List;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/chat")

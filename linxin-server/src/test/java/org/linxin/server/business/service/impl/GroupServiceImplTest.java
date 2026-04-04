@@ -1,5 +1,9 @@
 package org.linxin.server.business.service.impl;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
@@ -19,19 +23,18 @@ import org.linxin.server.business.vo.GroupVO;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 public class GroupServiceImplTest {
 
-    @Mock private GroupMapper groupMapper;
-    @Mock private GroupMemberMapper groupMemberMapper;
-    @Mock private ConversationMapper conversationMapper;
-    @Mock private UserMapper userMapper;
+    @Mock
+    private GroupMapper groupMapper;
+    @Mock
+    private GroupMemberMapper groupMemberMapper;
+    @Mock
+    private ConversationMapper conversationMapper;
+    @Mock
+    private UserMapper userMapper;
 
     @InjectMocks
     private GroupServiceImpl groupService;
@@ -55,14 +58,14 @@ public class GroupServiceImplTest {
         owner.setNickname("Owner");
 
         when(userMapper.selectById(userId)).thenReturn(owner);
-        
+
         // 模拟 selectById 返回刚才插入的群组
         Group mockGroup = new Group();
         mockGroup.setId(100L);
         mockGroup.setName("Test Group");
         mockGroup.setOwnerId(userId);
         mockGroup.setDeleted(0);
-        
+
         when(groupMapper.selectById(any())).thenReturn(mockGroup);
 
         GroupVO result = groupService.createGroup(userId, request);

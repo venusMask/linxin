@@ -3,10 +3,14 @@ package org.linxin.server.business.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.annotation.Lazy;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.linxin.server.ai.dto.ChatRequest;
+import org.linxin.server.ai.dto.ChatResponse;
+import org.linxin.server.ai.service.AIService;
 import org.linxin.server.business.converter.ChatConverter;
 import org.linxin.server.business.entity.Conversation;
 import org.linxin.server.business.entity.Group;
@@ -19,22 +23,16 @@ import org.linxin.server.business.mapper.GroupMemberMapper;
 import org.linxin.server.business.mapper.MessageMapper;
 import org.linxin.server.business.mapper.UserMapper;
 import org.linxin.server.business.model.request.SendMessageRequest;
-import org.linxin.server.business.service.IChatService;
 import org.linxin.server.business.service.IAgentService;
+import org.linxin.server.business.service.IChatService;
 import org.linxin.server.business.vo.ConversationVO;
 import org.linxin.server.business.vo.MessageVO;
 import org.linxin.server.common.constant.SendStatus;
 import org.linxin.server.websocket.WebSocketHandler;
 import org.linxin.server.websocket.WebSocketMessage;
-import org.linxin.server.ai.service.AIService;
-import org.linxin.server.ai.dto.ChatRequest;
-import org.linxin.server.ai.dto.ChatResponse;
-
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Service
@@ -110,7 +108,7 @@ public class ChatServiceImpl implements IChatService {
         LambdaQueryWrapper<Conversation> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Conversation::getUserId, userId).eq(Conversation::getPeerId, peerId);
         Conversation conversation = conversationMapper.selectOne(wrapper);
-        
+
         if (conversation == null) {
             User peer = userMapper.selectById(peerId);
             if (peer == null) {
@@ -140,21 +138,23 @@ public class ChatServiceImpl implements IChatService {
         if (receiver == null) {
             throw new RuntimeException("接收者不存在");
         }
-        
+
         Conversation senderConversation = getOrCreateConversation(senderId, request.getReceiverId());
         Conversation receiverConversation = getOrCreateConversation(request.getReceiverId(), senderId);
-        
+
         LocalDateTime sendTime = LocalDateTime.now();
-        Message message = createMessageEntity(senderConversation.getId(), senderId, request.getReceiverId(), request, sendTime);
+        Message message = createMessageEntity(senderConversation.getId(), senderId, request.getReceiverId(), request,
+                sendTime);
         messageMapper.insert(message);
-        
-        Message receiverMessage = createMessageEntity(receiverConversation.getId(), senderId, request.getReceiverId(), request, sendTime);
+
+        Message receiverMessage = createMessageEntity(receiverConversation.getId(), senderId, request.getReceiverId(),
+                request, sendTime);
         messageMapper.insert(receiverMessage);
-        
+
         updateSenderConversation(senderConversation, message, senderId);
         updateReceiverConversation(receiverConversation, receiverMessage, senderId);
         saveMessageStatus(receiverMessage.getId(), request.getReceiverId());
-        
+
         // 推送给接收方
         MessageVO messageVO = chatConverter.toVO(receiverMessage);
         User sender = userMapper.selectById(senderId);
@@ -185,12 +185,12 @@ public class ChatServiceImpl implements IChatService {
         ChatRequest aiRequest = new ChatRequest();
         aiRequest.setContent(request.getContent());
         aiRequest.setUserId(userId);
-        
+
         // 异步执行 AI 逻辑，此处为了 MVP 简单起见直接同步调用或由独立线程处理
         new Thread(() -> {
             try {
                 ChatResponse response = aiService.processUserInput(aiRequest);
-                
+
                 // 3. 处理 AI 的回复文本
                 Message aiReply = new Message();
                 aiReply.setConversationId(conversation.getId());
@@ -201,9 +201,10 @@ public class ChatServiceImpl implements IChatService {
                 aiReply.setSendStatus(SendStatus.SENT);
                 messageMapper.insert(aiReply);
                 updateSenderConversation(conversation, aiReply, 999L);
-                
+
                 // 推送回复给用户
-                webSocketHandler.sendMessageToUser(userId, new WebSocketMessage("new_message", chatConverter.toVO(aiReply)));
+                webSocketHandler.sendMessageToUser(userId,
+                        new WebSocketMessage("new_message", chatConverter.toVO(aiReply)));
 
                 // 4. 如果有 Tool Calls，执行工具
                 if (response.getToolCalls() != null && !response.getToolCalls().isEmpty()) {
@@ -219,7 +220,8 @@ public class ChatServiceImpl implements IChatService {
         return userMsg;
     }
 
-    private Message createMessageEntity(Long convId, Long senderId, Long receiverId, SendMessageRequest request, LocalDateTime time) {
+    private Message createMessageEntity(Long convId, Long senderId, Long receiverId, SendMessageRequest request,
+            LocalDateTime time) {
         Message m = new Message();
         m.setConversationId(convId);
         m.setSenderId(senderId);
@@ -279,7 +281,8 @@ public class ChatServiceImpl implements IChatService {
         if (conversation != null) {
             conversation.setUnreadCount(0);
             conversationMapper.updateById(conversation);
-            webSocketHandler.sendMessageToUser(userId, new WebSocketMessage("read_status", Map.of("conversationId", conversationId, "unreadCount", 0)));
+            webSocketHandler.sendMessageToUser(userId,
+                    new WebSocketMessage("read_status", Map.of("conversationId", conversationId, "unreadCount", 0)));
         }
     }
 
@@ -353,7 +356,8 @@ public class ChatServiceImpl implements IChatService {
                 .set(Conversation::getLastMessageContent, truncateContent(message.getContent(), 50))
                 .set(Conversation::getLastMessageType, message.getMessageType())
                 .set(Conversation::getLastMessageTime, message.getSendTime());
-        if (conversation.getMuteStatus() == 0) updateWrapper.setSql("unread_count = unread_count + 1");
+        if (conversation.getMuteStatus() == 0)
+            updateWrapper.setSql("unread_count = unread_count + 1");
         conversationMapper.update(null, updateWrapper);
     }
 
@@ -371,8 +375,10 @@ public class ChatServiceImpl implements IChatService {
     public Message sendGroupMessage(Long senderId, SendMessageRequest request) {
         Long groupId = request.getGroupId();
         Group group = groupMapper.selectById(groupId);
-        if (group == null || group.getDeleted() == 1) throw new RuntimeException("群组不存在");
-        List<GroupMember> members = groupMemberMapper.selectList(new LambdaQueryWrapper<GroupMember>().eq(GroupMember::getGroupId, groupId).eq(GroupMember::getDeleted, 0));
+        if (group == null || group.getDeleted() == 1)
+            throw new RuntimeException("群组不存在");
+        List<GroupMember> members = groupMemberMapper.selectList(new LambdaQueryWrapper<GroupMember>()
+                .eq(GroupMember::getGroupId, groupId).eq(GroupMember::getDeleted, 0));
         LocalDateTime sendTime = LocalDateTime.now();
         Message senderMsg = null;
         for (GroupMember member : members) {
@@ -380,7 +386,7 @@ public class ChatServiceImpl implements IChatService {
             Message message = new Message();
             message.setConversationId(conversation.getId());
             message.setSenderId(senderId);
-            message.setReceiverId(0L); 
+            message.setReceiverId(0L);
             message.setGroupId(groupId);
             message.setMessageType(request.getMessageType());
             message.setContent(request.getContent());
@@ -401,7 +407,8 @@ public class ChatServiceImpl implements IChatService {
                 }
                 messageVO.setGroupId(groupId);
                 messageVO.setConversationType(1);
-                webSocketHandler.sendMessageToUser(member.getUserId(), new WebSocketMessage("group_message", messageVO));
+                webSocketHandler.sendMessageToUser(member.getUserId(),
+                        new WebSocketMessage("group_message", messageVO));
             }
         }
         return senderMsg;
@@ -428,20 +435,24 @@ public class ChatServiceImpl implements IChatService {
     }
 
     private String truncateContent(String content, int maxLength) {
-        if (content == null) return null;
+        if (content == null)
+            return null;
         return content.length() > maxLength ? content.substring(0, maxLength) + "..." : content;
     }
 
     @Override
     public List<MessageVO> syncMessages(Long userId, Long lastSequenceId) {
-        List<Long> groupIds = groupMemberMapper.selectList(new LambdaQueryWrapper<GroupMember>().eq(GroupMember::getUserId, userId).eq(GroupMember::getDeleted, 0))
+        List<Long> groupIds = groupMemberMapper
+                .selectList(new LambdaQueryWrapper<GroupMember>().eq(GroupMember::getUserId, userId)
+                        .eq(GroupMember::getDeleted, 0))
                 .stream().map(GroupMember::getGroupId).collect(Collectors.toList());
         LambdaQueryWrapper<Message> wrapper = new LambdaQueryWrapper<>();
         wrapper.gt(Message::getSequenceId, lastSequenceId)
-               .and(w -> {
-                   w.eq(Message::getSenderId, userId).or().eq(Message::getReceiverId, userId);
-                   if (!groupIds.isEmpty()) w.or().in(Message::getGroupId, groupIds);
-               }).orderByAsc(Message::getSequenceId);
+                .and(w -> {
+                    w.eq(Message::getSenderId, userId).or().eq(Message::getReceiverId, userId);
+                    if (!groupIds.isEmpty())
+                        w.or().in(Message::getGroupId, groupIds);
+                }).orderByAsc(Message::getSequenceId);
         List<Message> messages = messageMapper.selectList(wrapper);
         return messages.stream().map(m -> {
             MessageVO vo = chatConverter.toVO(m);

@@ -12,7 +12,8 @@ import org.linxin.server.business.vo.FriendVO;
 @Mapper
 public interface FriendMapper extends BaseMapper<Friend> {
 
-    @Select("SELECT f.*, u_friend.username, u_friend.nickname, u_friend.avatar, u_friend.signature, u_friend.status as user_status " +
+    @Select("SELECT f.*, u_friend.username, u_friend.nickname, u_friend.avatar, u_friend.signature, u_friend.status as user_status "
+            +
             "FROM friends f " +
             "JOIN users u_me ON f.user_id = u_me.id " +
             "LEFT JOIN users u_friend ON f.friend_id = u_friend.id " +

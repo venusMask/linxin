@@ -1,9 +1,8 @@
 package org.linxin.server.business.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
-import lombok.Data;
-
 import java.time.LocalDateTime;
+import lombok.Data;
 
 @Data
 @TableName("group_members")

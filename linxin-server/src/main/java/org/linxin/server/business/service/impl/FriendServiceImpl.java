@@ -4,9 +4,10 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.linxin.server.business.model.request.FriendHandleRequest;
-import org.linxin.server.business.model.request.FriendUpdateRequest;
 import org.linxin.server.business.entity.Friend;
 import org.linxin.server.business.entity.FriendApply;
 import org.linxin.server.business.entity.User;
@@ -14,15 +15,13 @@ import org.linxin.server.business.mapper.FriendApplyMapper;
 import org.linxin.server.business.mapper.FriendMapper;
 import org.linxin.server.business.mapper.UserMapper;
 import org.linxin.server.business.model.request.FriendApplyRequest;
+import org.linxin.server.business.model.request.FriendHandleRequest;
+import org.linxin.server.business.model.request.FriendUpdateRequest;
 import org.linxin.server.business.service.IFriendService;
 import org.linxin.server.business.vo.FriendApplyVO;
 import org.linxin.server.business.vo.FriendVO;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -50,7 +49,8 @@ public class FriendServiceImpl extends ServiceImpl<FriendMapper, Friend> impleme
             if (user != null) {
                 vo.setUsername(user.getUsername());
                 vo.setAvatar(user.getAvatar());
-                if (vo.getFriendNickname() == null) vo.setFriendNickname(user.getNickname());
+                if (vo.getFriendNickname() == null)
+                    vo.setFriendNickname(user.getNickname());
             }
             return vo;
         });
@@ -89,7 +89,8 @@ public class FriendServiceImpl extends ServiceImpl<FriendMapper, Friend> impleme
     @Transactional(rollbackFor = Exception.class)
     public void handleFriendApply(Long userId, FriendHandleRequest request) {
         FriendApply apply = friendApplyMapper.selectById(request.getApplyId());
-        if (apply == null || !apply.getToUserId().equals(userId)) return;
+        if (apply == null || !apply.getToUserId().equals(userId))
+            return;
 
         apply.setStatus(request.getStatus());
         apply.setHandleTime(LocalDateTime.now());
@@ -104,7 +105,7 @@ public class FriendServiceImpl extends ServiceImpl<FriendMapper, Friend> impleme
         if (!isFriend(user1, user2)) {
             User u1 = userMapper.selectById(user1);
             User u2 = userMapper.selectById(user2);
-            
+
             Friend f1 = new Friend();
             f1.setUserId(user1);
             f1.setFriendId(user2);
@@ -141,22 +142,28 @@ public class FriendServiceImpl extends ServiceImpl<FriendMapper, Friend> impleme
         wrapper.eq(Friend::getUserId, userId).eq(Friend::getFriendId, request.getFriendId());
         Friend friend = friendMapper.selectOne(wrapper);
         if (friend != null) {
-            if (request.getFriendNickname() != null) friend.setFriendNickname(request.getFriendNickname());
-            if (request.getFriendGroup() != null) friend.setFriendGroup(request.getFriendGroup());
-            if (request.getTags() != null) friend.setTags(request.getTags());
+            if (request.getFriendNickname() != null)
+                friend.setFriendNickname(request.getFriendNickname());
+            if (request.getFriendGroup() != null)
+                friend.setFriendGroup(request.getFriendGroup());
+            if (request.getTags() != null)
+                friend.setTags(request.getTags());
             friendMapper.updateById(friend);
         }
     }
 
     @Override
     public void deleteFriend(Long userId, Long friendId) {
-        friendMapper.delete(new LambdaQueryWrapper<Friend>().eq(Friend::getUserId, userId).eq(Friend::getFriendId, friendId));
-        friendMapper.delete(new LambdaQueryWrapper<Friend>().eq(Friend::getUserId, friendId).eq(Friend::getFriendId, userId));
+        friendMapper.delete(
+                new LambdaQueryWrapper<Friend>().eq(Friend::getUserId, userId).eq(Friend::getFriendId, friendId));
+        friendMapper.delete(
+                new LambdaQueryWrapper<Friend>().eq(Friend::getUserId, friendId).eq(Friend::getFriendId, userId));
     }
 
     @Override
     public boolean isFriend(Long userId, Long friendId) {
-        return friendMapper.selectCount(new LambdaQueryWrapper<Friend>().eq(Friend::getUserId, userId).eq(Friend::getFriendId, friendId)) > 0;
+        return friendMapper.selectCount(
+                new LambdaQueryWrapper<Friend>().eq(Friend::getUserId, userId).eq(Friend::getFriendId, friendId)) > 0;
     }
 
     @Override
@@ -164,14 +171,16 @@ public class FriendServiceImpl extends ServiceImpl<FriendMapper, Friend> impleme
         User targetUser = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUsername, recipientName));
         LambdaQueryWrapper<Friend> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Friend::getUserId, userId)
-               .and(w -> {
-                   w.like(Friend::getFriendNickname, recipientName).or().like(Friend::getTags, recipientName);
-                   if (targetUser != null) w.or().eq(Friend::getFriendId, targetUser.getId());
-                   try {
-                       Long id = Long.parseLong(recipientName);
-                       w.or().eq(Friend::getFriendId, id);
-                   } catch (NumberFormatException ignored) {}
-               });
+                .and(w -> {
+                    w.like(Friend::getFriendNickname, recipientName).or().like(Friend::getTags, recipientName);
+                    if (targetUser != null)
+                        w.or().eq(Friend::getFriendId, targetUser.getId());
+                    try {
+                        Long id = Long.parseLong(recipientName);
+                        w.or().eq(Friend::getFriendId, id);
+                    } catch (NumberFormatException ignored) {
+                    }
+                });
         return friendMapper.selectList(wrapper);
     }
 }

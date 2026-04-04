@@ -2,8 +2,8 @@ package org.linxin.server.business.controller;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
 import org.linxin.server.business.model.request.AddGroupMembersRequest;
 import org.linxin.server.business.model.request.CreateGroupRequest;
 import org.linxin.server.business.model.request.UpdateAnnouncementRequest;
@@ -11,8 +11,7 @@ import org.linxin.server.business.service.IGroupService;
 import org.linxin.server.business.vo.GroupMemberVO;
 import org.linxin.server.business.vo.GroupVO;
 import org.linxin.server.common.result.Result;
-
-import java.util.List;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/group")

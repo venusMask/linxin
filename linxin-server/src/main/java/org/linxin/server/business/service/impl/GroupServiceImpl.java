@@ -1,9 +1,13 @@
 package org.linxin.server.business.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.linxin.server.business.entity.Conversation;
 import org.linxin.server.business.entity.Group;
 import org.linxin.server.business.entity.GroupMember;
@@ -18,13 +22,8 @@ import org.linxin.server.business.service.IGroupService;
 import org.linxin.server.business.vo.GroupMemberVO;
 import org.linxin.server.business.vo.GroupVO;
 import org.linxin.server.common.exception.BusinessException;
-
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -308,8 +307,8 @@ public class GroupServiceImpl implements IGroupService {
         group.setMemberCount(groupMemberMapper.selectCount(
                 new LambdaQueryWrapper<GroupMember>()
                         .eq(GroupMember::getGroupId, groupId)
-                        .eq(GroupMember::getDeleted, 0)
-        ).intValue());
+                        .eq(GroupMember::getDeleted, 0))
+                .intValue());
         groupMapper.updateById(group);
     }
 

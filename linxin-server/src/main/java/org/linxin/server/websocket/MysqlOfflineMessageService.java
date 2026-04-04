@@ -1,13 +1,11 @@
 package org.linxin.server.websocket;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.Collections;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
-
-import java.util.Collections;
-import java.util.List;
 
 /**
  * 离线消息服务 MySQL 实现
@@ -29,7 +27,7 @@ public class MysqlOfflineMessageService implements IOfflineMessageService {
     public List<Object> fetchAndClearMessages(Long userId) {
         log.debug("Fetching unread messages for user {} from MySQL", userId);
         List<org.linxin.server.business.vo.MessageVO> unreadMessages = messageMapper.selectUnreadMessages(userId);
-        
+
         if (unreadMessages.isEmpty()) {
             return Collections.emptyList();
         }

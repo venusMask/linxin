@@ -2,12 +2,12 @@ package org.linxin.server.auth;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import lombok.RequiredArgsConstructor;
+import org.linxin.server.business.entity.User;
+import org.linxin.server.business.mapper.UserMapper;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
-import org.linxin.server.business.entity.User;
-import org.linxin.server.business.mapper.UserMapper;
 
 @Service
 @RequiredArgsConstructor

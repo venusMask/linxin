@@ -1,6 +1,9 @@
 package org.linxin.server.ai.service.impl;
 
 import jakarta.annotation.PostConstruct;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.linxin.server.ai.adapter.AIModelAdapter;
@@ -14,10 +17,6 @@ import org.linxin.server.ai.service.AIService;
 import org.linxin.server.ai.tools.AITool;
 import org.linxin.server.ai.tools.ToolsConfig;
 import org.springframework.stereotype.Service;
-
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
 
 @Slf4j
 @Service
@@ -41,14 +40,16 @@ public class AIServiceImpl implements AIService {
                     .toList();
 
             for (AIProviderConfig p : sortedProviders) {
-                adapters.add(new OpenAIAdapter(p.getName(), p.getBaseUrl(), p.getApiKey(), p.getModel(), p.getTemperature()));
+                adapters.add(new OpenAIAdapter(p.getName(), p.getBaseUrl(), p.getApiKey(), p.getModel(),
+                        p.getTemperature()));
                 log.info("加载 AI Provider: {}", p.getName());
             }
         }
 
         // 2. 向后兼容处理单点配置
         if (aiConfig.getBaseUrl() != null && !aiConfig.getBaseUrl().isEmpty()) {
-            adapters.add(new OpenAIAdapter("Default", aiConfig.getBaseUrl(), aiConfig.getApiKey(), aiConfig.getModel(), aiConfig.getTemperature()));
+            adapters.add(new OpenAIAdapter("Default", aiConfig.getBaseUrl(), aiConfig.getApiKey(), aiConfig.getModel(),
+                    aiConfig.getTemperature()));
         }
 
         this.activeAdapter = new FailoverAIModelAdapter(adapters);
@@ -57,7 +58,7 @@ public class AIServiceImpl implements AIService {
     @Override
     public ChatResponse processUserInput(ChatRequest request) {
         ChatResponse response = activeAdapter.chat(request.getContent(), toolsConfig.getTools());
-        
+
         // 异步记录消耗日志
         if (response.getUsage() != null) {
             final Long userId = request.getUserId();
@@ -82,7 +83,7 @@ public class AIServiceImpl implements AIService {
                 }
             }).start();
         }
-        
+
         return response;
     }
 

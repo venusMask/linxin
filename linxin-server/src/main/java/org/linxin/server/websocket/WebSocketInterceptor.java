@@ -1,9 +1,8 @@
 package org.linxin.server.websocket;
 
-import org.springframework.web.socket.server.support.HttpSessionHandshakeInterceptor;
-import org.linxin.server.auth.JwtService;
-
 import java.util.Map;
+import org.linxin.server.auth.JwtService;
+import org.springframework.web.socket.server.support.HttpSessionHandshakeInterceptor;
 
 public class WebSocketInterceptor extends HttpSessionHandshakeInterceptor {
 
@@ -14,10 +13,10 @@ public class WebSocketInterceptor extends HttpSessionHandshakeInterceptor {
     }
 
     @Override
-    public boolean beforeHandshake(org.springframework.http.server.ServerHttpRequest request, 
-                                 org.springframework.http.server.ServerHttpResponse response, 
-                                 org.springframework.web.socket.WebSocketHandler wsHandler, 
-                                 Map<String, Object> attributes) throws Exception {
+    public boolean beforeHandshake(org.springframework.http.server.ServerHttpRequest request,
+            org.springframework.http.server.ServerHttpResponse response,
+            org.springframework.web.socket.WebSocketHandler wsHandler,
+            Map<String, Object> attributes) throws Exception {
         // 从请求头获取token
         String token = request.getHeaders().getFirst("Authorization");
         if (token != null && token.startsWith("Bearer ")) {

@@ -1,9 +1,19 @@
 package org.linxin.server.business.controller;
 
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.when;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.HashMap;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
-import org.linxin.server.auth.JwtService;
 import org.linxin.server.auth.DPUserDetailLoginService;
+import org.linxin.server.auth.JwtService;
 import org.linxin.server.business.mapper.UserMapper;
 import org.linxin.server.business.service.IAgentService;
 import org.linxin.server.business.service.IAgentTokenService;
@@ -14,17 +24,6 @@ import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
-
-import java.util.HashMap;
-import java.util.Map;
-
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.when;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(AgentController.class)
 @AutoConfigureMockMvc(addFilters = false)
@@ -40,9 +39,12 @@ public class AgentControllerTest {
     private IAgentTokenService agentTokenService;
 
     // 必须 Mock 这些 Bean 以满足 JwtAuthenticationFilter 的构造需求，从而让 SecurityConfig 加载成功
-    @MockBean private JwtService jwtService;
-    @MockBean private DPUserDetailLoginService userDetailsService;
-    @MockBean private UserMapper userMapper;
+    @MockBean
+    private JwtService jwtService;
+    @MockBean
+    private DPUserDetailLoginService userDetailsService;
+    @MockBean
+    private UserMapper userMapper;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -71,10 +73,10 @@ public class AgentControllerTest {
         when(agentService.callTool(anyLong(), anyString(), anyMap(), anyString())).thenReturn(mockResult);
 
         mockMvc.perform(post("/api/agent/call")
-                        .with(csrf())
-                        .requestAttr("userId", 1001L)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(request)))
+                .with(csrf())
+                .requestAttr("userId", 1001L)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("SUCCESS"));
     }

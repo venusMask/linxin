@@ -5,24 +5,20 @@ import java.time.LocalDateTime;
 import lombok.Data;
 
 @Data
-@TableName("`groups`")
-public class Group {
+@TableName("email_verification_codes")
+public class EmailVerificationCode {
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    private String name;
+    private String email;
 
-    private String avatar;
+    private String code;
 
-    private Long ownerId;
-
-    private String announcement;
-
-    private Integer memberLimit;
-
-    private Integer memberCount;
+    private String type;
 
     private Integer status;
+
+    private LocalDateTime expireTime;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createTime;

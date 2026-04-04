@@ -1,7 +1,7 @@
 package org.linxin.server.ai.dto;
 
-import lombok.Data;
 import java.util.Map;
+import lombok.Data;
 
 @Data
 public class ChatRequest {

@@ -1,6 +1,10 @@
 package org.linxin.server.business.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+import java.time.LocalDateTime;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -11,13 +15,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
-
-import java.time.LocalDateTime;
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 public class AgentTokenServiceImplTest {
@@ -74,7 +71,7 @@ public class AgentTokenServiceImplTest {
         AgentToken mockToken = new AgentToken();
         mockToken.setToken(tokenStr);
         mockToken.setStatus(1);
-        mockToken.setExpireTime(LocalDateTime.now().minusDays(1)); 
+        mockToken.setExpireTime(LocalDateTime.now().minusDays(1));
 
         lenient().when(agentTokenMapper.selectOne(any(), anyBoolean())).thenReturn(mockToken);
 

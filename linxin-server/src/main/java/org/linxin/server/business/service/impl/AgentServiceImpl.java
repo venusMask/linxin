@@ -1,5 +1,6 @@
 package org.linxin.server.business.service.impl;
 
+import java.util.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.linxin.server.business.entity.Friend;
@@ -8,8 +9,6 @@ import org.linxin.server.business.service.IAgentService;
 import org.linxin.server.business.service.IFriendService;
 import org.linxin.server.business.service.IMessageService;
 import org.springframework.stereotype.Service;
-
-import java.util.*;
 
 @Slf4j
 @Service
@@ -23,20 +22,20 @@ public class AgentServiceImpl implements IAgentService {
     public Map<String, Object> getManifest() {
         Map<String, Object> manifest = new HashMap<>();
         manifest.put("version", "1.0.0");
-        
+
         List<Map<String, Object>> tools = new ArrayList<>();
-        
+
         Map<String, Object> sendMessage = new HashMap<>();
         sendMessage.put("name", "send_message");
         sendMessage.put("description", "发送文本消息。支持模糊匹配联系人。");
-        
+
         Map<String, Object> params = new HashMap<>();
         params.put("recipient", "string (目标联系人名称/备注/语义描述如'媳妇')");
         params.put("content", "string (消息文本)");
-        
+
         sendMessage.put("parameters", params);
         tools.add(sendMessage);
-        
+
         manifest.put("tools", tools);
         return manifest;
     }
@@ -68,9 +67,8 @@ public class AgentServiceImpl implements IAgentService {
             List<Map<String, String>> choices = new ArrayList<>();
             for (Friend f : candidates) {
                 choices.add(Map.of(
-                    "hint", f.getFriendNickname() + (f.getTags() != null ? " (" + f.getTags() + ")" : ""),
-                    "id_placeholder", f.getFriendId().toString()
-                ));
+                        "hint", f.getFriendNickname() + (f.getTags() != null ? " (" + f.getTags() + ")" : ""),
+                        "id_placeholder", f.getFriendId().toString()));
             }
             Map<String, Object> res = errorResponse("AMBIGUOUS_RECIPIENT", "发现多个匹配项，请确认：");
             res.put("choices", choices);
@@ -84,9 +82,8 @@ public class AgentServiceImpl implements IAgentService {
         Map<String, Object> success = new HashMap<>();
         success.put("status", "SUCCESS");
         success.put("data", Map.of(
-            "target", candidates.get(0).getFriendNickname(),
-            "sequenceId", msg.getSequenceId()
-        ));
+                "target", candidates.get(0).getFriendNickname(),
+                "sequenceId", msg.getSequenceId()));
         return success;
     }
 

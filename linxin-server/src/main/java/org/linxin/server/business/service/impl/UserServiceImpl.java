@@ -1,10 +1,10 @@
 package org.linxin.server.business.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.linxin.server.business.converter.UserConverter;
 import org.linxin.server.business.entity.User;
 import org.linxin.server.business.mapper.UserMapper;
@@ -12,10 +12,9 @@ import org.linxin.server.business.model.request.UserLoginRequest;
 import org.linxin.server.business.model.request.UserRegisterRequest;
 import org.linxin.server.business.service.IUserService;
 import org.linxin.server.business.vo.UserVO;
-
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.stream.Collectors;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -33,7 +32,7 @@ public class UserServiceImpl implements IUserService {
         if (userMapper.selectCount(wrapper) > 0) {
             throw new RuntimeException("用户名已存在");
         }
-        
+
         User user = new User();
         user.setUsername(request.getUsername());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
@@ -51,15 +50,15 @@ public class UserServiceImpl implements IUserService {
         LambdaQueryWrapper<User> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(User::getUsername, request.getUsername());
         User user = userMapper.selectOne(wrapper);
-        
+
         if (user == null || !passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new RuntimeException("用户名或密码错误");
         }
-        
+
         if (user.getStatus() == 0) {
             throw new RuntimeException("账号已被禁用");
         }
-        
+
         user.setLastLoginTime(LocalDateTime.now());
         userMapper.updateById(user);
         return user;

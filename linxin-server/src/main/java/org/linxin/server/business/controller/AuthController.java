@@ -3,20 +3,22 @@ package org.linxin.server.business.controller;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
-import org.linxin.server.auth.JwtService;
-import org.linxin.server.business.converter.UserConverter;
-import org.linxin.server.business.entity.User;
-import org.linxin.server.business.model.request.UserLoginRequest;
-import org.linxin.server.business.model.request.UserRegisterRequest;
-import org.linxin.server.business.service.IUserService;
-import org.linxin.server.business.vo.UserVO;
-import org.linxin.server.common.result.Result;
-
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import lombok.RequiredArgsConstructor;
+import org.linxin.server.auth.JwtService;
+import org.linxin.server.business.converter.UserConverter;
+import org.linxin.server.business.entity.User;
+import org.linxin.server.business.model.request.SendEmailCodeRequest;
+import org.linxin.server.business.model.request.UserLoginRequest;
+import org.linxin.server.business.model.request.UserRegisterRequest;
+import org.linxin.server.business.model.request.VerifyEmailCodeRequest;
+import org.linxin.server.business.service.IEmailVerificationService;
+import org.linxin.server.business.service.IUserService;
+import org.linxin.server.business.vo.UserVO;
+import org.linxin.server.common.result.Result;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/auth")
@@ -25,6 +27,7 @@ import java.util.Map;
 public class AuthController {
 
     private final IUserService userService;
+    private final IEmailVerificationService emailVerificationService;
     private final JwtService jwtService;
     private final UserConverter userConverter;
 
@@ -40,7 +43,7 @@ public class AuthController {
     public Result<Map<String, Object>> login(@Valid @RequestBody UserLoginRequest request) {
         User user = userService.login(request);
         String token = jwtService.generateToken(user.getId(), user.getUsername());
-        
+
         Map<String, Object> data = new HashMap<>();
         data.put("token", token);
         data.put("userId", user.getId());
@@ -71,5 +74,19 @@ public class AuthController {
             return Result.error("用户不存在");
         }
         return Result.success(userVO);
+    }
+
+    @PostMapping("/email/send-code")
+    @Operation(summary = "发送邮箱验证码")
+    public Result<Void> sendEmailCode(@Valid @RequestBody SendEmailCodeRequest request) {
+        emailVerificationService.sendVerificationCode(request.getEmail());
+        return Result.success(null);
+    }
+
+    @PostMapping("/email/verify-code")
+    @Operation(summary = "验证邮箱验证码")
+    public Result<Void> verifyEmailCode(@Valid @RequestBody VerifyEmailCodeRequest request) {
+        emailVerificationService.verifyCode(request.getEmail(), request.getCode());
+        return Result.success(null);
     }
 }

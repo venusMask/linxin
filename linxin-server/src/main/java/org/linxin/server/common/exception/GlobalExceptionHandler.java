@@ -1,6 +1,7 @@
 package org.linxin.server.common.exception;
 
 import lombok.extern.slf4j.Slf4j;
+import org.linxin.server.common.result.Result;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.BindException;
 import org.springframework.validation.FieldError;
@@ -8,7 +9,6 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-import org.linxin.server.common.result.Result;
 
 @Slf4j
 @RestControllerAdvice

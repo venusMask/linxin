@@ -2,14 +2,13 @@ package org.linxin.server.business.service;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
+import java.util.List;
+import org.linxin.server.business.entity.Friend;
 import org.linxin.server.business.model.request.FriendApplyRequest;
 import org.linxin.server.business.model.request.FriendHandleRequest;
 import org.linxin.server.business.model.request.FriendUpdateRequest;
-import org.linxin.server.business.entity.Friend;
 import org.linxin.server.business.vo.FriendApplyVO;
 import org.linxin.server.business.vo.FriendVO;
-
-import java.util.List;
 
 public interface IFriendService extends IService<Friend> {
     IPage<FriendVO> getFriendList(Long userId, String keyword, Integer pageNum, Integer pageSize);

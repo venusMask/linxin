@@ -9,8 +9,8 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "auth")
 public class AuthConfig {
 
-    private String secret = "default_secret_key_for_jwt_token_generation_that_is_at_least_256_bits_long"; 
-    
+    private String secret = "default_secret_key_for_jwt_token_generation_that_is_at_least_256_bits_long";
+
     private int expire;
 
     public int getExpire() {

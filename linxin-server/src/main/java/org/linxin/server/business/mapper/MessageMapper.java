@@ -1,15 +1,12 @@
 package org.linxin.server.business.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
-import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import java.util.List;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 import org.linxin.server.business.entity.Message;
 import org.linxin.server.business.vo.MessageVO;
-
-import java.util.List;
 
 @Mapper
 public interface MessageMapper extends BaseMapper<Message> {

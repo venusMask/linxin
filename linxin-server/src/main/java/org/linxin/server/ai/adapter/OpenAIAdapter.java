@@ -1,14 +1,13 @@
 package org.linxin.server.ai.adapter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.*;
-import org.springframework.web.client.RestTemplate;
-import org.linxin.server.ai.dto.ChatResponse;
-import org.linxin.server.ai.tools.AITool;
-
 import java.util.*;
 import java.util.stream.Collectors;
+import lombok.extern.slf4j.Slf4j;
+import org.linxin.server.ai.dto.ChatResponse;
+import org.linxin.server.ai.tools.AITool;
+import org.springframework.http.*;
+import org.springframework.web.client.RestTemplate;
 
 @Slf4j
 public class OpenAIAdapter implements AIModelAdapter {
@@ -57,8 +56,7 @@ public class OpenAIAdapter implements AIModelAdapter {
                     baseUrl + "/chat/completions",
                     HttpMethod.POST,
                     entity,
-                    String.class
-            );
+                    String.class);
 
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 Map<String, Object> responseMap = objectMapper.readValue(response.getBody(), Map.class);
@@ -68,16 +66,21 @@ public class OpenAIAdapter implements AIModelAdapter {
             return createErrorResponse("AI服务返回异常状态码: " + response.getStatusCode());
         } catch (Exception e) {
             log.error("OpenAI chat failed", e);
-            if (e instanceof RuntimeException) throw (RuntimeException) e;
+            if (e instanceof RuntimeException)
+                throw (RuntimeException) e;
             throw new RuntimeException(e);
         }
     }
 
     @Override
-    public String getProviderName() { return providerName; }
+    public String getProviderName() {
+        return providerName;
+    }
 
     @Override
-    public String getModelName() { return model; }
+    public String getModelName() {
+        return model;
+    }
 
     private String buildSystemPrompt(List<AITool> tools) {
         StringBuilder sb = new StringBuilder();
@@ -92,7 +95,8 @@ public class OpenAIAdapter implements AIModelAdapter {
         sb.append("\n\n返回格式（必须是有效JSON）：\n");
         sb.append("{\n");
         sb.append("  \"intent\": \"操作意图名称\",\n");
-        sb.append("  \"toolCalls\": [{\"toolId\": \"tool的id\", \"toolName\": \"tool的name\", \"params\": {}, \"description\": \"描述\"}],\n");
+        sb.append(
+                "  \"toolCalls\": [{\"toolId\": \"tool的id\", \"toolName\": \"tool的name\", \"params\": {}, \"description\": \"描述\"}],\n");
         sb.append("  \"aiText\": \"对用户的确认提示语\",\n");
         sb.append("  \"needConfirm\": true\n");
         sb.append("}\n\n");
@@ -112,7 +116,8 @@ public class OpenAIAdapter implements AIModelAdapter {
                     paramMap.put("type", param.getType());
                     paramMap.put("description", param.getDescription());
                     properties.put(param.getName(), paramMap);
-                    if (param.isRequired()) required.add(param.getName());
+                    if (param.isRequired())
+                        required.add(param.getName());
                 }
             }
             Map<String, Object> parameters = new HashMap<>();
@@ -130,7 +135,7 @@ public class OpenAIAdapter implements AIModelAdapter {
     @SuppressWarnings("unchecked")
     private ChatResponse parseResponse(Map<String, Object> responseMap) {
         ChatResponse chatResponse = new ChatResponse();
-        
+
         // 解析 Usage
         Map<String, Object> usageMap = (Map<String, Object>) responseMap.get("usage");
         if (usageMap != null) {
@@ -160,7 +165,8 @@ public class OpenAIAdapter implements AIModelAdapter {
                 toolCall.setToolName((String) function.get("name"));
                 try {
                     toolCall.setParams(objectMapper.readValue((String) function.get("arguments"), Map.class));
-                } catch (Exception e) {}
+                } catch (Exception e) {
+                }
                 calls.add(toolCall);
             }
             chatResponse.setIntent("tool_call");
@@ -183,5 +189,6 @@ public class OpenAIAdapter implements AIModelAdapter {
     }
 
     @Override
-    public void dispose() {}
+    public void dispose() {
+    }
 }

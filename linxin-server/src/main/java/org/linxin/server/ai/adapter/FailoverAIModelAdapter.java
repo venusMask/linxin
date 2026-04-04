@@ -1,13 +1,11 @@
 package org.linxin.server.ai.adapter;
 
+import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.linxin.server.ai.dto.ChatResponse;
 import org.linxin.server.ai.tools.AITool;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.ResourceAccessException;
-
-import java.util.Collections;
-import java.util.List;
 
 @Slf4j
 public class FailoverAIModelAdapter implements AIModelAdapter {
@@ -21,13 +19,15 @@ public class FailoverAIModelAdapter implements AIModelAdapter {
 
     @Override
     public String getProviderName() {
-        if (adapters == null || adapters.isEmpty()) return "Unknown";
+        if (adapters == null || adapters.isEmpty())
+            return "Unknown";
         return adapters.get(currentActiveIndex).getProviderName();
     }
 
     @Override
     public String getModelName() {
-        if (adapters == null || adapters.isEmpty()) return "Unknown";
+        if (adapters == null || adapters.isEmpty())
+            return "Unknown";
         return adapters.get(currentActiveIndex).getModelName();
     }
 
@@ -43,17 +43,17 @@ public class FailoverAIModelAdapter implements AIModelAdapter {
             try {
                 log.info("尝试使用 AI 适配器 [{}]: {}", i, adapter.getProviderName());
                 ChatResponse response = adapter.chat(userInput, tools);
-                
+
                 if ("error".equals(response.getIntent()) && isQuotaExceeded(response.getAiText())) {
                     log.warn("适配器 {} 额度已用尽，准备切换...", i);
-                    continue; 
+                    continue;
                 }
-                
+
                 this.currentActiveIndex = i;
                 return response;
             } catch (HttpClientErrorException e) {
-                if (e.getStatusCode() == org.springframework.http.HttpStatus.TOO_MANY_REQUESTS || 
-                    e.getStatusCode() == org.springframework.http.HttpStatus.PAYMENT_REQUIRED) {
+                if (e.getStatusCode() == org.springframework.http.HttpStatus.TOO_MANY_REQUESTS ||
+                        e.getStatusCode() == org.springframework.http.HttpStatus.PAYMENT_REQUIRED) {
                     log.warn("AI 适配器 {} 额度超限: {}", i, e.getMessage());
                     continue; // 切换下一个
                 }
@@ -79,9 +79,10 @@ public class FailoverAIModelAdapter implements AIModelAdapter {
     }
 
     private boolean isQuotaExceeded(String text) {
-        if (text == null) return false;
+        if (text == null)
+            return false;
         String lower = text.toLowerCase();
-        return lower.contains("quota") || lower.contains("balance") || lower.contains("insufficient") 
+        return lower.contains("quota") || lower.contains("balance") || lower.contains("insufficient")
                 || lower.contains("allocationquota") || lower.contains("额度不足") || lower.contains("余额不足");
     }
 
@@ -94,6 +95,7 @@ public class FailoverAIModelAdapter implements AIModelAdapter {
 
     @Override
     public void dispose() {
-        for (AIModelAdapter adapter : adapters) adapter.dispose();
+        for (AIModelAdapter adapter : adapters)
+            adapter.dispose();
     }
 }

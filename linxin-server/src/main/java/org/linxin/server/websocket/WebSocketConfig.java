@@ -1,11 +1,11 @@
 package org.linxin.server.websocket;
 
+import org.linxin.server.auth.JwtService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.socket.config.annotation.EnableWebSocket;
 import org.springframework.web.socket.config.annotation.WebSocketConfigurer;
 import org.springframework.web.socket.config.annotation.WebSocketHandlerRegistry;
-import org.linxin.server.auth.JwtService;
 
 @Configuration
 @EnableWebSocket

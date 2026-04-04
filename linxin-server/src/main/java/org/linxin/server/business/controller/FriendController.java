@@ -4,8 +4,8 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
 import org.linxin.server.business.model.request.FriendApplyRequest;
 import org.linxin.server.business.model.request.FriendHandleRequest;
 import org.linxin.server.business.model.request.FriendListRequest;
@@ -14,8 +14,7 @@ import org.linxin.server.business.service.IFriendService;
 import org.linxin.server.business.vo.FriendApplyVO;
 import org.linxin.server.business.vo.FriendVO;
 import org.linxin.server.common.result.Result;
-
-import java.util.List;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/friends")
@@ -32,10 +31,9 @@ public class FriendController {
             @RequestBody FriendListRequest request) {
         IPage<FriendVO> friends = friendService.getFriendList(
                 userId,
-                request.getUsername(), 
-                request.getPageNum(), 
-                request.getPageSize()
-        );
+                request.getUsername(),
+                request.getPageNum(),
+                request.getPageSize());
         return Result.success(friends);
     }
 

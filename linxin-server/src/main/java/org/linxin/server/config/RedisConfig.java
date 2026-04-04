@@ -1,6 +1,5 @@
 package org.linxin.server.config;
 
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 
@@ -12,4 +11,3 @@ public class RedisConfig {
 
     // Redis 相关的 Bean 定义被移除，改为在有 Redis 依赖时通过条件配置加载
 }
-

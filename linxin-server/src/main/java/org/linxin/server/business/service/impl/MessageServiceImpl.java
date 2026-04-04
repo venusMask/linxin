@@ -3,25 +3,24 @@ package org.linxin.server.business.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
 import lombok.RequiredArgsConstructor;
-import org.linxin.server.business.model.request.SendMessageRequest;
 import org.linxin.server.business.entity.Message;
 import org.linxin.server.business.mapper.MessageMapper;
+import org.linxin.server.business.model.request.SendMessageRequest;
 import org.linxin.server.business.service.IMessageService;
 import org.linxin.server.websocket.WebSocketHandler;
 import org.linxin.server.websocket.WebSocketMessage;
 import org.springframework.stereotype.Service;
-
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
 
 @Service
 @RequiredArgsConstructor
 public class MessageServiceImpl extends ServiceImpl<MessageMapper, Message> implements IMessageService {
 
     private final WebSocketHandler webSocketHandler;
-    
+
     // MVP: 使用原子类模拟全局递增序列号 (实际生产应使用 Redis 或分布式 ID)
     private static final AtomicLong sequenceGenerator = new AtomicLong(10000);
 
@@ -37,13 +36,13 @@ public class MessageServiceImpl extends ServiceImpl<MessageMapper, Message> impl
         message.setSendStatus(1);
         message.setIsAi(false); // 用户手动发送
         message.setSequenceId(sequenceGenerator.incrementAndGet());
-        
+
         this.save(message);
-        
+
         // 推送给接收方
-        webSocketHandler.sendMessageToUser(request.getReceiverId(), 
-            new WebSocketMessage("new_message", message));
-            
+        webSocketHandler.sendMessageToUser(request.getReceiverId(),
+                new WebSocketMessage("new_message", message));
+
         return message;
     }
 
@@ -52,7 +51,7 @@ public class MessageServiceImpl extends ServiceImpl<MessageMapper, Message> impl
         Page<Message> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<Message> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Message::getConversationId, conversationId)
-               .orderByDesc(Message::getSequenceId);
+                .orderByDesc(Message::getSequenceId);
         return this.page(page, wrapper).getRecords();
     }
 
@@ -72,7 +71,7 @@ public class MessageServiceImpl extends ServiceImpl<MessageMapper, Message> impl
         message.setIsAi(true); // AI 发送
         message.setSenderType(agentName); // 存储 Agent 名称
         message.setSequenceId(sequenceGenerator.incrementAndGet());
-        
+
         this.save(message);
 
         // 推送给双方

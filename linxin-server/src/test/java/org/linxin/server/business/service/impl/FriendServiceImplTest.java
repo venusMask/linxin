@@ -1,6 +1,10 @@
 package org.linxin.server.business.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.linxin.server.business.entity.Friend;
@@ -10,12 +14,6 @@ import org.linxin.server.business.mapper.UserMapper;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.util.List;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 public class FriendServiceImplTest {
@@ -33,7 +31,7 @@ public class FriendServiceImplTest {
     public void testResolveRecipient_ByNickname() {
         Long userId = 1L;
         String keyword = "小王";
-        
+
         Friend mockFriend = new Friend();
         mockFriend.setFriendNickname("小王");
         mockFriend.setFriendId(2L);
@@ -51,7 +49,7 @@ public class FriendServiceImplTest {
     public void testResolveRecipient_ByTags() {
         Long userId = 1L;
         String keyword = "媳妇";
-        
+
         Friend mockFriend = new Friend();
         mockFriend.setTags("媳妇,爱人");
         mockFriend.setFriendId(2L);
@@ -69,7 +67,7 @@ public class FriendServiceImplTest {
     public void testResolveRecipient_ByUsername() {
         Long userId = 1L;
         String username = "lx_user_888";
-        
+
         User mockUser = new User();
         mockUser.setId(888L);
         mockUser.setUsername(username);

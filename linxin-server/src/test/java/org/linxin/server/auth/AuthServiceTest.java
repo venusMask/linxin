@@ -1,6 +1,9 @@
 package org.linxin.server.auth;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.linxin.server.business.converter.UserConverter;
@@ -14,16 +17,15 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
-
 @ExtendWith(MockitoExtension.class)
 public class AuthServiceTest {
 
-    @Mock private UserMapper userMapper;
-    @Mock private PasswordEncoder passwordEncoder;
-    @Mock private UserConverter userConverter;
+    @Mock
+    private UserMapper userMapper;
+    @Mock
+    private PasswordEncoder passwordEncoder;
+    @Mock
+    private UserConverter userConverter;
 
     @InjectMocks
     private UserServiceImpl userService;
