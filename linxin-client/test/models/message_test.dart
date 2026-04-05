@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:lin_xin/models/message.dart';
+import 'package:lin_xin/modules/chat/message.dart';
 
 void main() {
   group('Message Model Tests', () {

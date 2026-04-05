@@ -20,8 +20,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final DPUserDetailLoginService userDetailsService;
-    private final org.linxin.server.business.service.IAgentTokenService agentTokenService;
-    private final org.linxin.server.business.mapper.UserMapper userMapper;
+    private final org.linxin.server.module.auth.service.IAgentTokenService agentTokenService;
+    private final org.linxin.server.module.user.mapper.UserMapper userMapper;
 
     @Override
     protected void doFilterInternal(

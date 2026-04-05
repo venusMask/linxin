@@ -4,10 +4,10 @@ import java.util.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.linxin.server.ai.handler.AIToolHandler;
-import org.linxin.server.business.entity.Friend;
-import org.linxin.server.business.entity.Message;
-import org.linxin.server.business.service.IFriendService;
-import org.linxin.server.business.service.IMessageService;
+import org.linxin.server.module.chat.entity.Message;
+import org.linxin.server.module.chat.service.IMessageService;
+import org.linxin.server.module.contact.entity.Friend;
+import org.linxin.server.module.contact.service.IFriendService;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -17,7 +17,7 @@ public class SendMessageHandler implements AIToolHandler {
 
     private final IFriendService friendService;
     private final IMessageService messageService;
-    private final org.linxin.server.business.mapper.UserMapper userMapper;
+    private final org.linxin.server.module.user.mapper.UserMapper userMapper;
 
     @Override
     public String getToolName() {
@@ -51,9 +51,9 @@ public class SendMessageHandler implements AIToolHandler {
             candidates = friendService.resolveRecipient(userId, recipient);
             // 语义增强：如果好友列表没找到，尝试在全局用户表里找（作为补充）
             if (candidates.isEmpty()) {
-                org.linxin.server.business.entity.User globalUser = userMapper.selectOne(
-                        new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<org.linxin.server.business.entity.User>()
-                                .eq(org.linxin.server.business.entity.User::getUsername, recipient));
+                org.linxin.server.module.user.entity.User globalUser = userMapper.selectOne(
+                        new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<org.linxin.server.module.user.entity.User>()
+                                .eq(org.linxin.server.module.user.entity.User::getUsername, recipient));
                 if (globalUser != null) {
                     Friend virtualFriend = new Friend();
                     virtualFriend.setFriendId(globalUser.getId());

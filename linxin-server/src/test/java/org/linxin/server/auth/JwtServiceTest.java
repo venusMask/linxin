@@ -24,7 +24,7 @@ public class JwtServiceTest {
         Long userId = 123L;
         String username = "testuser";
 
-        String token = jwtService.generateToken(userId, username);
+        String token = jwtService.generateToken(userId, username, 1);
         assertNotNull(token);
 
         String extractedUsername = jwtService.extractUsername(token);
@@ -38,7 +38,7 @@ public class JwtServiceTest {
     public void testValidateToken() {
         Long userId = 123L;
         String username = "testuser";
-        String token = jwtService.generateToken(userId, username);
+        String token = jwtService.generateToken(userId, username, 1);
 
         assertTrue(jwtService.validateToken(token, username));
         assertFalse(jwtService.validateToken(token, "otheruser"));

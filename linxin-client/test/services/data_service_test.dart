@@ -1,9 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:lin_xin/services/data_service.dart';
-import 'package:lin_xin/models/friend.dart';
-import 'package:lin_xin/services/http_service.dart';
-import 'package:lin_xin/services/auth_service.dart';
-import 'package:lin_xin/models/user.dart';
+import 'package:lin_xin/core/state/data_service.dart';
+import 'package:lin_xin/modules/contact/friend.dart';
+import 'package:lin_xin/core/service/http_service.dart';
+import 'package:lin_xin/modules/auth/auth_service.dart';
+import 'package:lin_xin/modules/auth/user.dart';
 import 'package:dio/dio.dart';
 
 class ManualFakeHttpService implements HttpService {

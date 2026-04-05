@@ -1,5 +1,5 @@
 import 'package:logger/logger.dart';
-import '../services/log_service.dart';
+import 'package:lin_xin/core/service/log_service.dart';
 
 /// 灵信日志服务使用示例
 void demonstrateLogging() {

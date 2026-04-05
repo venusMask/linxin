@@ -9,6 +9,7 @@ import org.linxin.server.ai.core.tool.ToolProvider;
 import org.linxin.server.ai.dto.ChatRequest;
 import org.linxin.server.ai.dto.ChatResponse;
 import org.linxin.server.ai.service.AIService;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -22,10 +23,11 @@ public class AIServiceImpl implements AIService {
     private final org.linxin.server.ai.mapper.AIUsageLogMapper usageLogMapper;
 
     @Override
-    public ChatResponse processUserInput(ChatRequest request) {
+    public ChatResponse processUserInput(ChatRequest request,
+            java.util.List<org.linxin.server.ai.core.dto.ChatMessage> previousMessages) {
         log.info("Processing multi-step AI request for user: {}", request.getUserId());
 
-        ModelResponse agentResult = aiAgent.run(request.getUserId(), request.getContent());
+        ModelResponse agentResult = aiAgent.run(request.getUserId(), request.getContent(), previousMessages);
 
         // 转换为旧的 DTO 结构以兼容前端
         ChatResponse response = new ChatResponse();
@@ -47,22 +49,21 @@ public class AIServiceImpl implements AIService {
         return response;
     }
 
-    private void logUsage(Long userId, ModelResponse.Usage usage) {
-        new Thread(() -> {
-            try {
-                org.linxin.server.ai.entity.AIUsageLog logEntry = new org.linxin.server.ai.entity.AIUsageLog();
-                logEntry.setUserId(userId);
-                logEntry.setProviderName(activeModel.getProviderName());
-                logEntry.setModelName(activeModel.getModelName());
-                logEntry.setIntent("agent_workflow");
-                logEntry.setPromptTokens(usage.getPromptTokens());
-                logEntry.setCompletionTokens(usage.getCompletionTokens());
-                logEntry.setTotalTokens(usage.getTotalTokens());
-                usageLogMapper.insert(logEntry);
-            } catch (Exception e) {
-                log.error("Failed to log AI usage", e);
-            }
-        }).start();
+    @Async("taskExecutor")
+    protected void logUsage(Long userId, ModelResponse.Usage usage) {
+        try {
+            org.linxin.server.ai.entity.AIUsageLog logEntry = new org.linxin.server.ai.entity.AIUsageLog();
+            logEntry.setUserId(userId);
+            logEntry.setProviderName(activeModel.getProviderName());
+            logEntry.setModelName(activeModel.getModelName());
+            logEntry.setIntent("agent_workflow");
+            logEntry.setPromptTokens(usage.getPromptTokens());
+            logEntry.setCompletionTokens(usage.getCompletionTokens());
+            logEntry.setTotalTokens(usage.getTotalTokens());
+            usageLogMapper.insert(logEntry);
+        } catch (Exception e) {
+            log.error("Failed to log AI usage", e);
+        }
     }
 
     @Override

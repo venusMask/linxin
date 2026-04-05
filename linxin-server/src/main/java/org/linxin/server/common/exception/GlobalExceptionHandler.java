@@ -14,11 +14,18 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(BusinessException.class)
+    @ResponseStatus(HttpStatus.OK) // 业务异常通常返回 200，由 code 区分
+    public Result<Void> handleBusinessException(BusinessException e) {
+        log.warn("Business logic error: code={}, message={}", e.getCode(), e.getMessage());
+        return Result.error(e.getCode(), e.getMessage());
+    }
+
     @ExceptionHandler(RuntimeException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public Result<Void> handleRuntimeException(RuntimeException e) {
-        log.error("RuntimeException: {}", e.getMessage());
-        return Result.error(e.getMessage());
+        log.error("Unexpected RuntimeException: ", e);
+        return Result.error("操作失败，请重试");
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

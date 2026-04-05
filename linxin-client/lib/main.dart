@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'pages/main_page.dart';
-import 'pages/login_page.dart';
-import 'services/auth_service.dart';
-import 'services/data_service.dart';
-import 'services/log_service.dart';
+import 'package:lin_xin/core/pages/main_page.dart';
+import 'package:lin_xin/modules/auth/pages/login_page.dart';
+import 'package:lin_xin/modules/auth/auth_service.dart';
+import 'package:lin_xin/core/state/data_service.dart';
+import 'package:lin_xin/core/service/log_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();

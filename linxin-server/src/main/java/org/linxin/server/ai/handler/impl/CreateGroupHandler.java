@@ -4,9 +4,9 @@ import java.util.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.linxin.server.ai.handler.AIToolHandler;
-import org.linxin.server.business.model.request.CreateGroupRequest;
-import org.linxin.server.business.service.IGroupService;
-import org.linxin.server.business.vo.GroupVO;
+import org.linxin.server.module.group.model.request.CreateGroupRequest;
+import org.linxin.server.module.group.service.IGroupService;
+import org.linxin.server.module.group.vo.GroupVO;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -15,7 +15,7 @@ import org.springframework.stereotype.Component;
 public class CreateGroupHandler implements AIToolHandler {
 
     private final IGroupService groupService;
-    private final org.linxin.server.business.mapper.UserMapper userMapper;
+    private final org.linxin.server.module.user.mapper.UserMapper userMapper;
 
     @Override
     public String getToolName() {
@@ -46,9 +46,9 @@ public class CreateGroupHandler implements AIToolHandler {
                     memberIds.add(Long.valueOf(val));
                 } catch (NumberFormatException e) {
                     // 语义解析：如果不是数字，尝试作为用户名查找
-                    org.linxin.server.business.entity.User user = userMapper.selectOne(
-                            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<org.linxin.server.business.entity.User>()
-                                    .eq(org.linxin.server.business.entity.User::getUsername, val));
+                    org.linxin.server.module.user.entity.User user = userMapper.selectOne(
+                            new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<org.linxin.server.module.user.entity.User>()
+                                    .eq(org.linxin.server.module.user.entity.User::getUsername, val));
                     if (user != null) {
                         memberIds.add(user.getId());
                     }

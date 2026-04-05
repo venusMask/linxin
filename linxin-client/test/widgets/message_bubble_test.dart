@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:lin_xin/models/message.dart';
+import 'package:lin_xin/modules/chat/message.dart';
 import 'package:lin_xin/widgets/message_bubble.dart';
 
 void main() {

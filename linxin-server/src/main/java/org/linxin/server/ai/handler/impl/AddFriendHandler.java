@@ -4,8 +4,8 @@ import java.util.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.linxin.server.ai.handler.AIToolHandler;
-import org.linxin.server.business.model.request.FriendApplyRequest;
-import org.linxin.server.business.service.IFriendService;
+import org.linxin.server.module.contact.model.request.FriendApplyRequest;
+import org.linxin.server.module.contact.service.IFriendService;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -14,7 +14,7 @@ import org.springframework.stereotype.Component;
 public class AddFriendHandler implements AIToolHandler {
 
     private final IFriendService friendService;
-    private final org.linxin.server.business.mapper.UserMapper userMapper;
+    private final org.linxin.server.module.user.mapper.UserMapper userMapper;
 
     @Override
     public String getToolName() {
@@ -38,9 +38,9 @@ public class AddFriendHandler implements AIToolHandler {
             targetId = Long.valueOf(targetIdVal.toString());
         } catch (NumberFormatException e) {
             // 尝试作为用户名查找
-            org.linxin.server.business.entity.User user = userMapper.selectOne(
-                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<org.linxin.server.business.entity.User>()
-                            .eq(org.linxin.server.business.entity.User::getUsername, targetIdVal.toString()));
+            org.linxin.server.module.user.entity.User user = userMapper.selectOne(
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<org.linxin.server.module.user.entity.User>()
+                            .eq(org.linxin.server.module.user.entity.User::getUsername, targetIdVal.toString()));
             if (user != null) {
                 targetId = user.getId();
             }

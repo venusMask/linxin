@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dio/dio.dart';
-import 'package:lin_xin/pages/ai_chat_page.dart';
-import 'package:lin_xin/services/http_service.dart';
-import 'package:lin_xin/services/auth_service.dart';
-import 'package:lin_xin/services/data_service.dart';
-import 'package:lin_xin/services/message_local_service.dart';
-import 'package:lin_xin/models/user.dart';
-import 'package:lin_xin/models/friend.dart';
-import 'package:lin_xin/models/message.dart';
+import 'package:lin_xin/modules/ai/pages/ai_chat_page.dart';
+import 'package:lin_xin/core/service/http_service.dart';
+import 'package:lin_xin/modules/auth/auth_service.dart';
+import 'package:lin_xin/core/state/data_service.dart';
+import 'package:lin_xin/modules/chat/message_local_service.dart';
+import 'package:lin_xin/modules/auth/user.dart';
+import 'package:lin_xin/modules/contact/friend.dart';
+import 'package:lin_xin/modules/chat/message.dart';
 
 class ManualFakeHttpService implements HttpService {
   Map<String, dynamic>? getResponse;
@@ -144,11 +144,11 @@ void main() {
 
   testWidgets('AIChatPage should show error snackbar when initialization fails', (WidgetTester tester) async {
     fakeHttpService.getError = DioException(
-      requestOptions: RequestOptions(path: '/chat/conversations/12345'),
+      requestOptions: RequestOptions(path: '/chat/conversations/ai'),
       error: 'User not found',
       type: DioExceptionType.badResponse,
       response: Response(
-        requestOptions: RequestOptions(path: '/chat/conversations/12345'),
+        requestOptions: RequestOptions(path: '/chat/conversations/ai'),
         statusCode: 500,
         data: {'message': '用户不存在'}
       )

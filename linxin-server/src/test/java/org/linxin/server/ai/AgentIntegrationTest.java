@@ -7,12 +7,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.linxin.server.ai.core.agent.AIAgent;
 import org.linxin.server.ai.core.dto.ModelResponse;
-import org.linxin.server.business.entity.User;
-import org.linxin.server.business.mapper.UserMapper;
-import org.linxin.server.business.service.IFriendService;
-import org.linxin.server.business.service.IGroupService;
-import org.linxin.server.business.service.IMessageService;
-import org.linxin.server.business.vo.GroupVO;
+import org.linxin.server.module.chat.service.IMessageService;
+import org.linxin.server.module.contact.service.IFriendService;
+import org.linxin.server.module.group.service.IGroupService;
+import org.linxin.server.module.group.vo.GroupVO;
+import org.linxin.server.module.user.entity.User;
+import org.linxin.server.module.user.mapper.UserMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -108,7 +108,7 @@ public class AgentIntegrationTest {
         String input = String.format("给 %s 发送消息：这是一条来自AI的单步测试消息", userB.getUsername());
 
         System.out.println("--- Single Step Test Starting ---");
-        ModelResponse response = aiAgent.run(userA.getId(), input);
+        ModelResponse response = aiAgent.run(userA.getId(), input, java.util.Collections.emptyList());
 
         System.out.println("AI Response: " + response.getContent());
         assertNotNull(response.getContent());
@@ -125,7 +125,7 @@ public class AgentIntegrationTest {
                 userB.getUsername(), randomGroupName);
 
         System.out.println("--- Multi-step Agent Test Starting ---");
-        ModelResponse response = aiAgent.run(userA.getId(), input);
+        ModelResponse response = aiAgent.run(userA.getId(), input, java.util.Collections.emptyList());
 
         System.out.println("--- Agent Final Answer ---");
         System.out.println(response.getContent());
@@ -141,7 +141,7 @@ public class AgentIntegrationTest {
     private void forceBeFriends(Long u1, Long u2) {
         // 模拟直接成为好友的逻辑（绕过申请确认）
         try {
-            java.lang.reflect.Method method = org.linxin.server.business.service.impl.FriendServiceImpl.class
+            java.lang.reflect.Method method = org.linxin.server.module.contact.service.impl.FriendServiceImpl.class
                     .getDeclaredMethod("addFriendPair", Long.class, Long.class);
             method.setAccessible(true);
             method.invoke(friendService, u1, u2);

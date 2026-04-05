@@ -16,6 +16,12 @@ public class ConversationContext {
         messages.add(ChatMessage.system(systemPrompt));
     }
 
+    public void addPreviousMessages(List<ChatMessage> previousMessages) {
+        if (previousMessages != null) {
+            messages.addAll(previousMessages);
+        }
+    }
+
     public void addUserMessage(String content) {
         messages.add(ChatMessage.user(content));
     }

@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:dio/dio.dart';
-import 'package:lin_xin/services/http_service.dart';
+import 'package:lin_xin/core/service/http_service.dart';
 import 'package:lin_xin/config/api_config.dart';
 
 class ManualFakeDio implements Dio {

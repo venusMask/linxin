@@ -47,21 +47,21 @@ ai:
     # 阿里云百炼 - 首选旗舰模型
     - name: "Alibaba Qwen Max"
       baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1"
-      apiKey: ${AI_API_KEY}
+      apiKey: "${AI_API_KEY}"
       model: "qwen-max"
       priority: 10
 
 #    # 阿里云百炼 - 次选增强模型 (作为 Max 的备份)
 #    - name: "Alibaba Qwen Plus"
 #      baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1"
-#      apiKey: ${AI_API_KEY}
+#      apiKey: "${AI_API_KEY}"
 #      model: "qwen-plus"
 #      priority: 9
 #
 #    # 阿里云百炼 - 基础快速模型 (成本最低，最后保底)
 #    - name: "Alibaba Qwen Turbo"
 #      baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1"
-#      apiKey: "sk-d6d2cfd858574dd5a21610426030c900"
+#      apiKey: "${AI_API_KEY}"
 #      model: "qwen-turbo"
 #      priority: 8
 #

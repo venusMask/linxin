@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockito/mockito.dart';
 import 'package:dio/dio.dart';
-import 'package:lin_xin/pages/token_usage_page.dart';
-import 'package:lin_xin/services/http_service.dart';
+import 'package:lin_xin/modules/ai/pages/token_usage_page.dart';
+import 'package:lin_xin/core/service/http_service.dart';
 
 class MockHttpService extends Mock implements HttpService {
   @override

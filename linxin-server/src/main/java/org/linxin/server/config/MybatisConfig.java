@@ -10,7 +10,9 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-@MapperScan("org.linxin.server.business.mapper")
+@MapperScan({"org.linxin.server.module.user.mapper", "org.linxin.server.module.chat.mapper",
+        "org.linxin.server.module.contact.mapper", "org.linxin.server.module.group.mapper",
+        "org.linxin.server.module.auth.mapper", "org.linxin.server.ai.mapper"})
 public class MybatisConfig {
 
     @Bean

@@ -16,7 +16,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class MysqlOfflineMessageService implements IOfflineMessageService {
 
-    private final org.linxin.server.business.mapper.MessageMapper messageMapper;
+    private final org.linxin.server.module.chat.mapper.MessageMapper messageMapper;
 
     @Override
     public void saveOfflineMessage(Long userId, Object message) {
@@ -26,7 +26,7 @@ public class MysqlOfflineMessageService implements IOfflineMessageService {
     @Override
     public List<Object> fetchAndClearMessages(Long userId) {
         log.debug("Fetching unread messages for user {} from MySQL", userId);
-        List<org.linxin.server.business.vo.MessageVO> unreadMessages = messageMapper.selectUnreadMessages(userId);
+        List<org.linxin.server.module.chat.vo.MessageVO> unreadMessages = messageMapper.selectUnreadMessages(userId);
 
         if (unreadMessages.isEmpty()) {
             return Collections.emptyList();

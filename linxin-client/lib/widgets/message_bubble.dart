@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../models/message.dart';
+import 'package:lin_xin/modules/chat/message.dart';
 
 class MessageBubble extends StatelessWidget {
   final Message message;

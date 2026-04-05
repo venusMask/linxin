@@ -17,7 +17,7 @@ public class AIController {
 
     @PostMapping("/chat")
     public Result<ChatResponse> chat(@RequestBody ChatRequest request) {
-        ChatResponse response = aiService.processUserInput(request);
+        ChatResponse response = aiService.processUserInput(request, java.util.Collections.emptyList());
         return Result.success(response);
     }
 

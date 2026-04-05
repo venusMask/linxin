@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:lin_xin/models/user.dart';
-import 'package:lin_xin/models/friend.dart';
-import 'package:lin_xin/models/chat.dart';
+import 'package:lin_xin/modules/auth/user.dart';
+import 'package:lin_xin/modules/contact/friend.dart';
+import 'package:lin_xin/modules/chat/chat.dart';
 
 void main() {
   group('Core Model Tests', () {
