@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../widgets/avatar_widget.dart';
 import 'agent_token_page.dart';
+import 'edit_profile_page.dart';
+import 'account_security_page.dart';
+import 'general_settings_page.dart';
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -78,6 +81,21 @@ class ProfilePage extends StatelessWidget {
                         fontSize: 14,
                       ),
                     ),
+                    if (user?.signature != null && user!.signature!.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8, left: 32, right: 32),
+                        child: Text(
+                          user.signature!,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.7),
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -86,15 +104,30 @@ class ProfilePage extends StatelessWidget {
           SliverList(
             delegate: SliverChildListDelegate([
               const SizedBox(height: 12),
-              _buildMenuItem(Icons.person_outline, '个人信息', () {}),
+              _buildMenuItem(Icons.person_outline, '个人信息', () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const EditProfilePage()),
+                );
+              }),
               _buildMenuItem(Icons.smart_toy_outlined, 'Agent 开放平台', () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (context) => const AgentTokenPage()),
                 );
               }),
-              _buildMenuItem(Icons.security, '账号安全', () {}),
-              _buildMenuItem(Icons.settings_outlined, '通用设置', () {}),
+              _buildMenuItem(Icons.security, '账号安全', () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const AccountSecurityPage()),
+                );
+              }),
+              _buildMenuItem(Icons.settings_outlined, '通用设置', () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const GeneralSettingsPage()),
+                );
+              }),
               const SizedBox(height: 24),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),

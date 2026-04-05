@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 import lombok.RequiredArgsConstructor;
 import org.linxin.server.business.entity.Message;
+import org.linxin.server.business.entity.User;
 import org.linxin.server.business.mapper.MessageMapper;
 import org.linxin.server.business.model.request.SendMessageRequest;
 import org.linxin.server.business.service.IMessageService;
@@ -20,9 +21,16 @@ import org.springframework.stereotype.Service;
 public class MessageServiceImpl extends ServiceImpl<MessageMapper, Message> implements IMessageService {
 
     private final WebSocketHandler webSocketHandler;
+    private final org.linxin.server.business.mapper.UserMapper userMapper;
+    private final org.linxin.server.business.converter.ChatConverter chatConverter;
 
     // MVP: 使用原子类模拟全局递增序列号 (实际生产应使用 Redis 或分布式 ID)
     private static final AtomicLong sequenceGenerator = new AtomicLong(10000);
+
+    @Override
+    public Long getNextSequenceId() {
+        return sequenceGenerator.incrementAndGet();
+    }
 
     @Override
     public Message sendMessage(Long userId, SendMessageRequest request) {
@@ -35,7 +43,7 @@ public class MessageServiceImpl extends ServiceImpl<MessageMapper, Message> impl
         message.setSendTime(LocalDateTime.now());
         message.setSendStatus(1);
         message.setIsAi(false); // 用户手动发送
-        message.setSequenceId(sequenceGenerator.incrementAndGet());
+        message.setSequenceId(getNextSequenceId());
 
         this.save(message);
 
@@ -70,12 +78,20 @@ public class MessageServiceImpl extends ServiceImpl<MessageMapper, Message> impl
         message.setSendStatus(1);
         message.setIsAi(true); // AI 发送
         message.setSenderType(agentName); // 存储 Agent 名称
-        message.setSequenceId(sequenceGenerator.incrementAndGet());
+        message.setSequenceId(getNextSequenceId());
 
         this.save(message);
 
         // 推送给双方
-        WebSocketMessage wsMsg = new WebSocketMessage("new_message", message);
+        org.linxin.server.business.vo.MessageVO vo = chatConverter.toVO(message);
+        User sender = userMapper.selectById(senderId);
+        if (sender != null) {
+            vo.setSenderNickname(sender.getNickname());
+            vo.setSenderAvatar(sender.getAvatar());
+            vo.setUserType(sender.getUserType());
+        }
+
+        WebSocketMessage wsMsg = new WebSocketMessage("new_message", vo);
         webSocketHandler.sendMessageToUser(senderId, wsMsg);
         webSocketHandler.sendMessageToUser(receiverId, wsMsg);
 

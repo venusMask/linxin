@@ -4,6 +4,7 @@ class Friend {
   final String name;
   final String avatar;
   final List<String> tags; // 标签列表
+  final int userType; // 用户类型: 0-普通用户, 1-系统AI
 
   Friend({
     required this.id,
@@ -11,6 +12,7 @@ class Friend {
     required this.name,
     required this.avatar,
     this.tags = const [],
+    this.userType = 0,
   });
 
   Friend copyWith({
@@ -19,6 +21,7 @@ class Friend {
     String? name,
     String? avatar,
     List<String>? tags,
+    int? userType,
   }) {
     return Friend(
       id: id ?? this.id,
@@ -26,6 +29,7 @@ class Friend {
       name: name ?? this.name,
       avatar: avatar ?? this.avatar,
       tags: tags ?? this.tags,
+      userType: userType ?? this.userType,
     );
   }
 
@@ -36,6 +40,7 @@ class Friend {
       'name': name,
       'avatar': avatar,
       'tags': tags.join(','),
+      'userType': userType,
     };
   }
 
@@ -52,6 +57,7 @@ class Friend {
       name: json['name'] as String? ?? json['friendNickname'] as String? ?? '未知',
       avatar: json['avatar'] as String? ?? '',
       tags: tagsList,
+      userType: json['userType'] as int? ?? 0,
     );
   }
 }

@@ -16,11 +16,13 @@ import 'group_settings_page.dart';
 class ChatDetailPage extends StatefulWidget {
   final Chat chat;
   final User? currentUser;
+  final MessageLocalService? messageLocalService;
 
   const ChatDetailPage({
     super.key,
     required this.chat,
     this.currentUser,
+    this.messageLocalService,
   });
 
   @override
@@ -48,7 +50,7 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
   void initState() {
     super.initState();
     _currentUserId = AuthService().currentUser?.id?.toString();
-    _messageLocalService = MessageLocalService(DatabaseService());
+    _messageLocalService = widget.messageLocalService ?? MessageLocalService(DatabaseService());
     _messages = List.from(widget.chat.messages);
     _scrollToBottom();
     _initEventBus();
@@ -135,9 +137,13 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
     } catch (e) {
       debugPrint('标记已读失败: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('同步已读状态失败: $e')),
-        );
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('同步已读状态失败: $e')),
+            );
+          }
+        });
       }
     }
   }
@@ -233,9 +239,13 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
             _messages[index] = pendingMessage.copyWith(status: -1);
           }
         });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('发送失败: $e')),
-        );
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('发送失败: $e')),
+            );
+          }
+        });
       }
     }
   }

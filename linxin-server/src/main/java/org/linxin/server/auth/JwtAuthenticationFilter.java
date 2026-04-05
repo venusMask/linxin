@@ -51,8 +51,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 // 处理标准 JWT 鉴权
                 String username = jwtService.extractUsername(token);
                 Long userId = jwtService.extractUserId(token);
-                if (username != null && userId != null) {
-                    setAuthentication(request, username, userId);
+                Integer tokenPwdVer = jwtService.extractPasswordVersion(token);
+
+                if (username != null && userId != null && tokenPwdVer != null) {
+                    var user = userMapper.selectById(userId);
+                    if (user != null && tokenPwdVer.equals(user.getPasswordVersion())) {
+                        setAuthentication(request, username, userId);
+                    }
                 }
             }
         } catch (Exception e) {

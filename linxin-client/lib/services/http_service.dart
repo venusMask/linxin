@@ -1,10 +1,16 @@
 import 'package:dio/dio.dart';
+import 'package:meta/meta.dart';
 import '../config/api_config.dart';
 import 'log_service.dart';
 
 class HttpService {
-  static final HttpService _instance = HttpService._internal();
+  static HttpService _instance = HttpService._internal();
   factory HttpService() => _instance;
+
+  @visibleForTesting
+  static void setMock(HttpService mock) {
+    _instance = mock;
+  }
 
   late Dio _dio;
   String? _token;
@@ -118,7 +124,7 @@ class HttpService {
 
   Future<void> applyAddFriend(dynamic toUserId, {String? remark}) async {
     await post(ApiConfig.friendApply, data: {
-      'toUserId': toUserId,
+      'friendId': toUserId,
       'remark': remark ?? '你好，我想加你为好友',
     });
   }

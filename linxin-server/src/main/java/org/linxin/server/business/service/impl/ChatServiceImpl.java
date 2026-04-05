@@ -48,6 +48,7 @@ public class ChatServiceImpl implements IChatService {
     private final org.linxin.server.business.mapper.MessageStatusMapper messageStatusMapper;
     private final AIService aiService;
     private final IAgentService agentService;
+    private final org.linxin.server.business.service.IMessageService messageService;
 
     public ChatServiceImpl(
             ConversationMapper conversationMapper,
@@ -59,7 +60,8 @@ public class ChatServiceImpl implements IChatService {
             GroupMemberMapper groupMemberMapper,
             org.linxin.server.business.mapper.MessageStatusMapper messageStatusMapper,
             AIService aiService,
-            IAgentService agentService) {
+            IAgentService agentService,
+            org.linxin.server.business.service.IMessageService messageService) {
         this.conversationMapper = conversationMapper;
         this.messageMapper = messageMapper;
         this.userMapper = userMapper;
@@ -70,6 +72,11 @@ public class ChatServiceImpl implements IChatService {
         this.messageStatusMapper = messageStatusMapper;
         this.aiService = aiService;
         this.agentService = agentService;
+        this.messageService = messageService;
+    }
+
+    private User getSystemAIUser() {
+        return userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUserType, 1).last("LIMIT 1"));
     }
 
     @Override
@@ -86,17 +93,20 @@ public class ChatServiceImpl implements IChatService {
 
     @Override
     public Conversation getOrCreateConversation(Long userId, Long peerId) {
-        // AI 助手 (999) 特殊处理
-        if (peerId == 999L) {
+        User aiUser = getSystemAIUser();
+        Long aiUserId = aiUser != null ? aiUser.getId() : null;
+
+        // AI 助手特殊处理 (基于数据库中实际的 AI 用户 ID)
+        if (aiUserId != null && peerId.equals(aiUserId)) {
             LambdaQueryWrapper<Conversation> wrapper = new LambdaQueryWrapper<>();
-            wrapper.eq(Conversation::getUserId, userId).eq(Conversation::getPeerId, 999L);
+            wrapper.eq(Conversation::getUserId, userId).eq(Conversation::getPeerId, aiUserId);
             Conversation conversation = conversationMapper.selectOne(wrapper);
             if (conversation == null) {
                 conversation = new Conversation();
                 conversation.setUserId(userId);
-                conversation.setPeerId(999L);
-                conversation.setPeerNickname("AI 助手");
-                conversation.setPeerAvatar("");
+                conversation.setPeerId(aiUserId);
+                conversation.setPeerNickname(aiUser.getNickname());
+                conversation.setPeerAvatar(aiUser.getAvatar());
                 conversation.setUnreadCount(0);
                 conversation.setTopStatus(0);
                 conversation.setMuteStatus(0);
@@ -130,7 +140,10 @@ public class ChatServiceImpl implements IChatService {
     @Transactional(rollbackFor = Exception.class)
     @Override
     public Message sendMessage(Long senderId, SendMessageRequest request) {
-        if (request.getReceiverId() != null && request.getReceiverId() == 999L) {
+        User aiUser = getSystemAIUser();
+        Long aiUserId = aiUser != null ? aiUser.getId() : null;
+
+        if (request.getReceiverId() != null && aiUserId != null && request.getReceiverId().equals(aiUserId)) {
             return handleAIChat(senderId, request);
         }
 
@@ -161,23 +174,32 @@ public class ChatServiceImpl implements IChatService {
         if (sender != null) {
             messageVO.setSenderNickname(sender.getNickname());
             messageVO.setSenderAvatar(sender.getAvatar());
+            messageVO.setUserType(sender.getUserType());
         }
         webSocketHandler.sendMessageToUser(request.getReceiverId(), new WebSocketMessage("new_message", messageVO));
         return message;
     }
 
     private Message handleAIChat(Long userId, SendMessageRequest request) {
-        Conversation conversation = getOrCreateConversation(userId, 999L);
+        User aiUser = getSystemAIUser();
+        if (aiUser == null) {
+            throw new RuntimeException("AI 助手未在线，请稍后再试");
+        }
+        Long aiUserId = aiUser.getId();
+
+        Conversation conversation = getOrCreateConversation(userId, aiUserId);
         LocalDateTime now = LocalDateTime.now();
 
         // 1. 保存用户的消息
         Message userMsg = new Message();
         userMsg.setConversationId(conversation.getId());
         userMsg.setSenderId(userId);
-        userMsg.setReceiverId(999L);
+        userMsg.setReceiverId(aiUserId);
         userMsg.setContent(request.getContent());
         userMsg.setSendTime(now);
         userMsg.setSendStatus(SendStatus.SENT);
+        userMsg.setIsAi(false);
+        userMsg.setSequenceId(messageService.getNextSequenceId());
         messageMapper.insert(userMsg);
         updateSenderConversation(conversation, userMsg, userId);
 
@@ -194,13 +216,15 @@ public class ChatServiceImpl implements IChatService {
                 // 3. 处理 AI 的回复文本
                 Message aiReply = new Message();
                 aiReply.setConversationId(conversation.getId());
-                aiReply.setSenderId(999L);
+                aiReply.setSenderId(aiUserId);
                 aiReply.setReceiverId(userId);
                 aiReply.setContent(response.getReply());
                 aiReply.setSendTime(LocalDateTime.now());
                 aiReply.setSendStatus(SendStatus.SENT);
+                aiReply.setIsAi(true);
+                aiReply.setSequenceId(messageService.getNextSequenceId());
                 messageMapper.insert(aiReply);
-                updateSenderConversation(conversation, aiReply, 999L);
+                updateSenderConversation(conversation, aiReply, aiUserId);
 
                 // 推送回复给用户
                 webSocketHandler.sendMessageToUser(userId,
@@ -209,7 +233,27 @@ public class ChatServiceImpl implements IChatService {
                 // 4. 如果有 Tool Calls，执行工具
                 if (response.getToolCalls() != null && !response.getToolCalls().isEmpty()) {
                     for (var toolCall : response.getToolCalls()) {
-                        agentService.callTool(userId, toolCall.getFunctionName(), toolCall.getArguments(), "内置AI小助手");
+                        Map<String, Object> result = agentService.callTool(userId, toolCall.getFunctionName(),
+                                toolCall.getArguments(), "内置AI小助手");
+
+                        // 如果执行不成功，反馈给用户
+                        if (result != null && !"SUCCESS".equals(result.get("status"))) {
+                            String errorMsg = (String) result.get("message");
+
+                            Message feedback = new Message();
+                            feedback.setConversationId(conversation.getId());
+                            feedback.setSenderId(aiUserId);
+                            feedback.setReceiverId(userId);
+                            feedback.setContent("提示：" + errorMsg);
+                            feedback.setSendTime(LocalDateTime.now());
+                            feedback.setSendStatus(SendStatus.SENT);
+                            feedback.setIsAi(true);
+                            feedback.setSequenceId(messageService.getNextSequenceId());
+                            messageMapper.insert(feedback);
+
+                            webSocketHandler.sendMessageToUser(userId,
+                                    new WebSocketMessage("new_message", chatConverter.toVO(feedback)));
+                        }
                     }
                 }
             } catch (Exception e) {
@@ -231,11 +275,16 @@ public class ChatServiceImpl implements IChatService {
         m.setExtra(request.getExtra());
         m.setSendStatus(SendStatus.SENT);
         m.setSendTime(time);
+        m.setIsAi(false);
+        m.setSequenceId(messageService.getNextSequenceId());
         return m;
     }
 
     @Override
     public IPage<MessageVO> getMessageList(Long conversationId, Integer pageNum, Integer pageSize) {
+        User aiUser = getSystemAIUser();
+        Long aiUserId = aiUser != null ? aiUser.getId() : null;
+
         Page<Message> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<Message> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Message::getConversationId, conversationId).orderByDesc(Message::getSendTime);
@@ -246,8 +295,10 @@ public class ChatServiceImpl implements IChatService {
             if (sender != null) {
                 vo.setSenderNickname(sender.getNickname());
                 vo.setSenderAvatar(sender.getAvatar());
-            } else if (message.getSenderId() == 999L) {
-                vo.setSenderNickname("AI 助手");
+                vo.setUserType(sender.getUserType());
+            } else if (message.getSenderId().equals(aiUserId)) {
+                vo.setSenderNickname(aiUser != null ? aiUser.getNickname() : "AI 助手");
+                vo.setUserType(1);
             }
             return vo;
         });
@@ -392,6 +443,8 @@ public class ChatServiceImpl implements IChatService {
             message.setContent(request.getContent());
             message.setSendStatus(SendStatus.SENT);
             message.setSendTime(sendTime);
+            message.setIsAi(false);
+            message.setSequenceId(messageService.getNextSequenceId());
             messageMapper.insert(message);
             if (member.getUserId().equals(senderId)) {
                 senderMsg = message;
@@ -454,14 +507,20 @@ public class ChatServiceImpl implements IChatService {
                         w.or().in(Message::getGroupId, groupIds);
                 }).orderByAsc(Message::getSequenceId);
         List<Message> messages = messageMapper.selectList(wrapper);
+
+        User aiUser = getSystemAIUser();
+        Long aiUserId = aiUser != null ? aiUser.getId() : null;
+
         return messages.stream().map(m -> {
             MessageVO vo = chatConverter.toVO(m);
             User sender = userMapper.selectById(m.getSenderId());
             if (sender != null) {
                 vo.setSenderNickname(sender.getNickname());
                 vo.setSenderAvatar(sender.getAvatar());
-            } else if (m.getSenderId() == 999L) {
-                vo.setSenderNickname("AI 助手");
+                vo.setUserType(sender.getUserType());
+            } else if (aiUserId != null && m.getSenderId().equals(aiUserId)) {
+                vo.setSenderNickname(aiUser.getNickname());
+                vo.setUserType(1);
             }
             return vo;
         }).collect(Collectors.toList());

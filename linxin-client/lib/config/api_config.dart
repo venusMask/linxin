@@ -7,6 +7,9 @@ class ApiConfig {
   static const String userInfo = '/auth/userinfo';
   static const String searchUser = '/auth/search';
   static const String sendEmailCode = '/auth/email/send-code';
+  static const String updateProfile = '/auth/profile';
+  static const String updateEmail = '/auth/email';
+  static const String updatePassword = '/auth/password';
 
   // 聊天相关接口
   static const String conversationList = '/chat/conversations';

@@ -4,6 +4,10 @@ class User {
   final String? password;
   final String? nickname;
   final String? avatar;
+  final String? email;
+  final String? signature;
+  final int? gender;
+  final int? userType; // 用户类型: 0-普通用户, 1-系统AI
   final DateTime? createTime;
 
   User({
@@ -12,6 +16,10 @@ class User {
     this.password,
     this.nickname,
     this.avatar,
+    this.email,
+    this.signature,
+    this.gender,
+    this.userType = 0,
     this.createTime,
   });
 
@@ -21,6 +29,10 @@ class User {
     String? password,
     String? nickname,
     String? avatar,
+    String? email,
+    String? signature,
+    int? gender,
+    int? userType,
     DateTime? createTime,
   }) {
     return User(
@@ -29,6 +41,10 @@ class User {
       password: password ?? this.password,
       nickname: nickname ?? this.nickname,
       avatar: avatar ?? this.avatar,
+      email: email ?? this.email,
+      signature: signature ?? this.signature,
+      gender: gender ?? this.gender,
+      userType: userType ?? this.userType,
       createTime: createTime ?? this.createTime,
     );
   }
@@ -40,7 +56,11 @@ class User {
       'password': password,
       'nickname': nickname,
       'avatar': avatar,
-      'createTime': createTime?.toIso8601String(),
+      'email': email,
+      'signature': signature,
+      'gender': gender,
+      'userType': userType,
+      'create_time': createTime?.toIso8601String(),
     };
   }
 
@@ -51,6 +71,10 @@ class User {
       password: json['password'] as String?,
       nickname: json['nickname'] as String?,
       avatar: json['avatar'] as String?,
+      email: json['email'] as String?,
+      signature: json['signature'] as String?,
+      gender: json['gender'] as int?,
+      userType: json['userType'] as int? ?? 0,
       createTime: json['createTime'] != null
           ? DateTime.parse(json['createTime'] as String)
           : null,

@@ -13,4 +13,6 @@ public interface IMessageService extends IService<Message> {
     void markRead(Long userId, Long conversationId);
 
     Message sendAgentMessage(Long senderId, Long receiverId, String content, String agentName);
+
+    Long getNextSequenceId();
 }

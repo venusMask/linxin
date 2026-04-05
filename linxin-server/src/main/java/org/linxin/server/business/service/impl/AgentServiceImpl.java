@@ -1,13 +1,12 @@
 package org.linxin.server.business.service.impl;
 
+import jakarta.annotation.PostConstruct;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.linxin.server.business.entity.Friend;
-import org.linxin.server.business.entity.Message;
+import org.linxin.server.ai.handler.AIToolHandler;
 import org.linxin.server.business.service.IAgentService;
-import org.linxin.server.business.service.IFriendService;
-import org.linxin.server.business.service.IMessageService;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -15,8 +14,16 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class AgentServiceImpl implements IAgentService {
 
-    private final IFriendService friendService;
-    private final IMessageService messageService;
+    private final List<AIToolHandler> handlers;
+    private final Map<String, AIToolHandler> handlerMap = new ConcurrentHashMap<>();
+
+    @PostConstruct
+    public void init() {
+        for (AIToolHandler handler : handlers) {
+            handlerMap.put(handler.getToolName(), handler);
+            log.info("Registered AI Tool Handler: {}", handler.getToolName());
+        }
+    }
 
     @Override
     public Map<String, Object> getManifest() {
@@ -42,55 +49,30 @@ public class AgentServiceImpl implements IAgentService {
 
     @Override
     public Map<String, Object> callTool(Long userId, String toolName, Map<String, Object> arguments, String agentName) {
-        if ("send_message".equals(toolName)) {
-            return handleSendMessage(userId, arguments, agentName);
+        // 将驼峰转换或规范化 toolName (例如 sendMessage -> send_message)
+        String normalizedName = normalizeToolName(toolName);
+        AIToolHandler handler = handlerMap.get(normalizedName);
+
+        if (handler != null) {
+            log.info("Executing AI Tool: {} for user {}", normalizedName, userId);
+            return handler.execute(userId, arguments);
         }
+
         return errorResponse("UNKNOWN_TOOL", "不支持的工具: " + toolName);
     }
 
-    private Map<String, Object> handleSendMessage(Long userId, Map<String, Object> arguments, String agentName) {
-        String recipient = (String) arguments.get("recipient");
-        String content = (String) arguments.get("content");
-
-        if (recipient == null || content == null) {
-            return errorResponse("INVALID_ARGUMENTS", "缺少必要参数: recipient 或 content");
-        }
-
-        // 语义对齐：Resolver 逻辑
-        List<Friend> candidates = friendService.resolveRecipient(userId, recipient);
-
-        if (candidates.isEmpty()) {
-            return errorResponse("NOT_FOUND", "未找到匹配联系人: " + recipient);
-        }
-
-        if (candidates.size() > 1) {
-            List<Map<String, String>> choices = new ArrayList<>();
-            for (Friend f : candidates) {
-                choices.add(Map.of(
-                        "hint", f.getFriendNickname() + (f.getTags() != null ? " (" + f.getTags() + ")" : ""),
-                        "id_placeholder", f.getFriendId().toString()));
-            }
-            Map<String, Object> res = errorResponse("AMBIGUOUS_RECIPIENT", "发现多个匹配项，请确认：");
-            res.put("choices", choices);
-            return res;
-        }
-
-        // 执行发送
-        Long targetId = candidates.get(0).getFriendId();
-        Message msg = messageService.sendAgentMessage(userId, targetId, content, agentName);
-
-        Map<String, Object> success = new HashMap<>();
-        success.put("status", "SUCCESS");
-        success.put("data", Map.of(
-                "target", candidates.get(0).getFriendNickname(),
-                "sequenceId", msg.getSequenceId()));
-        return success;
+    private String normalizeToolName(String name) {
+        if (name == null)
+            return "";
+        // 处理驼峰命名转下划线 (例如 createGroup -> create_group)
+        String snaked = name.replaceAll("([a-z])([A-Z])", "$1_$2").toLowerCase();
+        // 处理可能存在的多个下划线
+        return snaked.replace("__", "_");
     }
 
     @Override
     public Map<String, Object> executeCommand(Long userId, String command, String agentName) {
-        // 保留旧接口用于兼容，但内部逻辑应重构为调用 LLM 进行意图解析后再调 callTool
-        // 这里暂时实现为提示用户
+        // 保留旧接口用于兼容
         return errorResponse("DEPRECATED", "请使用结构化的 /api/agent/call 接口，或在 App 内直接与 AI 对话");
     }
 

@@ -11,6 +11,7 @@ import org.linxin.server.business.entity.User;
 import org.linxin.server.business.mapper.UserMapper;
 import org.linxin.server.business.model.request.UserLoginRequest;
 import org.linxin.server.business.model.request.UserRegisterRequest;
+import org.linxin.server.business.service.IEmailVerificationService;
 import org.linxin.server.business.service.impl.UserServiceImpl;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -26,6 +27,8 @@ public class AuthServiceTest {
     private PasswordEncoder passwordEncoder;
     @Mock
     private UserConverter userConverter;
+    @Mock
+    private IEmailVerificationService emailVerificationService;
 
     @InjectMocks
     private UserServiceImpl userService;
@@ -36,13 +39,17 @@ public class AuthServiceTest {
         request.setUsername("newuser");
         request.setPassword("pass");
         request.setNickname("Nick");
+        request.setEmail("test@example.com");
+        request.setVerificationCode("123456");
 
         when(userMapper.selectCount(any())).thenReturn(0L);
         when(passwordEncoder.encode(any())).thenReturn("encoded");
+        when(emailVerificationService.verifyCode("test@example.com", "123456")).thenReturn(true);
 
         userService.register(request);
 
         verify(userMapper, times(1)).insert(any(User.class));
+        verify(emailVerificationService, times(1)).verifyCode("test@example.com", "123456");
     }
 
     @Test

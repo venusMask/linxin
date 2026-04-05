@@ -7,10 +7,13 @@ import '../services/auth_service.dart';
 import '../services/event_bus.dart';
 import '../services/db_service.dart';
 import '../services/message_local_service.dart';
+import '../services/data_service.dart';
 import '../widgets/message_bubble.dart';
 
 class AIChatPage extends StatefulWidget {
-  const AIChatPage({super.key});
+  final MessageLocalService? messageLocalService;
+
+  const AIChatPage({super.key, this.messageLocalService});
 
   @override
   State<AIChatPage> createState() => _AIChatPageState();
@@ -27,6 +30,7 @@ class _AIChatPageState extends State<AIChatPage> {
   String? _currentUserId;
   Chat? _aiChat;
   bool _isInitialLoading = true;
+  bool _isAiThinking = false;
 
   late StreamSubscription<MessageReceivedEvent> _messageReceivedSubscription;
 
@@ -34,42 +38,76 @@ class _AIChatPageState extends State<AIChatPage> {
   void initState() {
     super.initState();
     _currentUserId = AuthService().currentUser?.id.toString();
-    _messageLocalService = MessageLocalService(DatabaseService());
+    _messageLocalService = widget.messageLocalService ?? MessageLocalService(DatabaseService());
     _initAIChat();
     _initEventBus();
   }
 
   Future<void> _initAIChat() async {
-    // 999 是后端约定的 AI 助手 ID
     try {
-      final response = await _httpService.get('/chat/conversations/999');
+      // 动态寻找 AI 助手
+      final aiAssistant = DataService().getAiAssistant();
+      if (aiAssistant == null) {
+        throw Exception('未找到 AI 助手，请确保已添加 AI 助手为好友');
+      }
+      String aiId = aiAssistant.id;
+
+      final response = await _httpService.get('/chat/conversations/$aiId');
       final chat = Chat.fromJson(response.data);
       
-      setState(() {
-        _aiChat = chat;
-      });
+      if (mounted) {
+        setState(() {
+          _aiChat = chat;
+        });
+      }
 
       final localMessages = await _messageLocalService.getMessages(
         chat.id,
         currentUserId: _currentUserId,
       );
       
-      setState(() {
-        _messages = localMessages.reversed.toList();
-        _isInitialLoading = false;
-      });
-      _scrollToBottom();
+      if (mounted) {
+        setState(() {
+          _messages = localMessages.reversed.toList();
+          _isInitialLoading = false;
+        });
+        _scrollToBottom();
+      }
     } catch (e) {
       debugPrint('初始化 AI 会话失败: $e');
-      setState(() {
-        _isInitialLoading = false;
-      });
+      if (mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('初始化 AI 会话失败: $e')),
+            );
+          }
+        });
+        setState(() {
+          _isInitialLoading = false;
+        });
+      }
     }
   }
 
   void _initEventBus() {
     _messageReceivedSubscription = _eventBus.on<MessageReceivedEvent>().listen((event) {
       if (_aiChat != null && event.conversationId == _aiChat!.id) {
+        // 判断是否为 AI 发送
+        final sender = DataService().getFriendById(event.senderId);
+        bool isAiSender = sender?.userType == 1;
+        
+        // 兜底：如果 ID 匹配我们当前会话的 AI ID
+        if (!isAiSender && _aiChat!.friend != null) {
+           isAiSender = event.senderId == _aiChat!.friend!.id;
+        }
+
+        if (isAiSender) {
+          setState(() {
+            _isAiThinking = false;
+          });
+        }
+
         _addNewMessage(Message(
           id: event.messageId,
           conversationId: event.conversationId,
@@ -79,7 +117,7 @@ class _AIChatPageState extends State<AIChatPage> {
           status: 1,
           createdAt: event.createdAt,
           isMe: event.senderId == _currentUserId,
-          isAi: event.senderId == '999',
+          isAi: isAiSender,
         ));
       }
     });
@@ -98,7 +136,14 @@ class _AIChatPageState extends State<AIChatPage> {
 
   Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
-    if (text.isEmpty || _aiChat == null) return;
+    if (text.isEmpty) return;
+    
+    if (_aiChat == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('AI 会话未准备好，请尝试重新打开页面')),
+      );
+      return;
+    }
 
     final tempId = 'msg_${DateTime.now().millisecondsSinceEpoch}';
     final now = DateTime.now();
@@ -116,13 +161,17 @@ class _AIChatPageState extends State<AIChatPage> {
 
     setState(() {
       _messages.add(pendingMessage);
+      _isAiThinking = true;
       _messageController.clear();
     });
     _scrollToBottom();
 
     try {
+      final aiId = _aiChat!.friend?.id;
+      if (aiId == null) throw Exception('未找到 AI 助手 ID');
+
       final response = await _httpService.post('/chat/messages', data: {
-        'receiverId': 999,
+        'receiverId': aiId,
         'content': text,
         'messageType': 1,
       });
@@ -151,6 +200,38 @@ class _AIChatPageState extends State<AIChatPage> {
         });
       }
     }
+  }
+
+  Widget _buildThinkingIndicator() {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 5,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'AI 助手正在思考',
+              style: TextStyle(color: Colors.black87, fontSize: 14),
+            ),
+            const SizedBox(width: 4),
+            _ThreeDotsAnimation(),
+          ],
+        ),
+      ),
+    );
   }
 
   void _scrollToBottom() {
@@ -192,8 +273,11 @@ class _AIChatPageState extends State<AIChatPage> {
                 : ListView.builder(
                     controller: _scrollController,
                     padding: const EdgeInsets.all(16),
-                    itemCount: _messages.length,
+                    itemCount: _messages.length + (_isAiThinking ? 1 : 0),
                     itemBuilder: (context, index) {
+                      if (index == _messages.length) {
+                        return _buildThinkingIndicator();
+                      }
                       final message = _messages[index];
                       return MessageBubble(
                         message: message,
@@ -254,6 +338,51 @@ class _AIChatPageState extends State<AIChatPage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ThreeDotsAnimation extends StatefulWidget {
+  @override
+  State<_ThreeDotsAnimation> createState() => _ThreeDotsAnimationState();
+}
+
+class _ThreeDotsAnimationState extends State<_ThreeDotsAnimation> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  int _dotCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..addListener(() {
+        final newCount = (_controller.value * 4).floor() % 4;
+        if (newCount != _dotCount) {
+          setState(() {
+            _dotCount = newCount;
+          });
+        }
+      });
+    _controller.repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      '.' * _dotCount,
+      style: const TextStyle(
+        fontWeight: FontWeight.bold,
+        color: Color(0xFF00BFA5),
+        fontSize: 16,
       ),
     );
   }

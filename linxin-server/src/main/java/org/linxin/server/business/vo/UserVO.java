@@ -14,6 +14,7 @@ public class UserVO {
     private Integer gender;
     private String signature;
     private Integer status;
+    private Integer userType;
     private LocalDateTime lastLoginTime;
     private LocalDateTime createTime;
 }

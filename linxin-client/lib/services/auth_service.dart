@@ -8,9 +8,14 @@ import 'db_service.dart';
 import '../config/test_config.dart';
 
 class AuthService extends ChangeNotifier {
-  static final AuthService _instance = AuthService._internal();
+  static AuthService _instance = AuthService._internal();
   factory AuthService() => _instance;
   AuthService._internal();
+
+  @visibleForTesting
+  static void setMock(AuthService mock) {
+    _instance = mock;
+  }
 
   final HttpService _httpService = HttpService();
   User? _currentUser;
@@ -36,11 +41,16 @@ class AuthService extends ChangeNotifier {
 
     if (token != null && userId != null) {
       _httpService.setToken(token);
-      _currentUser = User(
-        id: int.parse(userId),
-        username: username ?? '',
-        nickname: nickname ?? username ?? '',
-      );
+      try {
+        final response = await _httpService.get(ApiConfig.userInfo);
+        _currentUser = User.fromJson(response.data);
+      } catch (e) {
+        // 如果请求失败，可能是 Token 已失效，清除本地数据
+        debugPrint('Auto login failed: $e');
+        await _clearAuthData();
+        _httpService.clearToken();
+        _currentUser = null;
+      }
       WebSocketService().setToken(token);
       await WebSocketService().connect();
     }
@@ -67,16 +77,83 @@ class AuthService extends ChangeNotifier {
     return User.fromJson(response.data);
   }
 
-  Future<bool> sendEmailVerificationCode(String email) async {
+  Future<bool> sendEmailVerificationCode(String email, {String type = 'register'}) async {
     try {
       await _httpService.post(
         ApiConfig.sendEmailCode,
-        data: {'email': email},
+        data: {'email': email, 'type': type},
       );
       return true;
     } catch (e) {
       rethrow;
     }
+  }
+
+  Future<void> updateProfile({
+    String? nickname,
+    String? username,
+    String? avatar,
+    String? signature,
+    int? gender,
+  }) async {
+    await _httpService.put(
+      ApiConfig.updateProfile,
+      data: {
+        'nickname': ?nickname,
+        'username': ?username,
+        'avatar': ?avatar,
+        'signature': ?signature,
+        'gender': ?gender,
+      },
+    );
+
+    if (_currentUser != null) {
+      _currentUser = _currentUser!.copyWith(
+        nickname: nickname,
+        username: username,
+        avatar: avatar,
+        signature: signature,
+        gender: gender,
+      );
+      final prefs = await SharedPreferences.getInstance();
+      final prefix = TestConfig.storagePrefix;
+      if (nickname != null) await prefs.setString('${prefix}auth_nickname', nickname);
+      if (username != null) await prefs.setString('${prefix}auth_username', username);
+      notifyListeners();
+    }
+  }
+
+  Future<void> updateEmail({
+    required String password,
+    required String newEmail,
+    required String code,
+  }) async {
+    await _httpService.put(
+      ApiConfig.updateEmail,
+      data: {
+        'password': password,
+        'newEmail': newEmail,
+        'code': code,
+      },
+    );
+
+    if (_currentUser != null) {
+      _currentUser = _currentUser!.copyWith(email: newEmail);
+      notifyListeners();
+    }
+  }
+
+  Future<void> updatePassword({
+    required String oldPassword,
+    required String newPassword,
+  }) async {
+    await _httpService.put(
+      ApiConfig.updatePassword,
+      data: {
+        'oldPassword': oldPassword,
+        'newPassword': newPassword,
+      },
+    );
   }
 
   Future<User?> login({

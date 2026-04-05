@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>灵信控制台 - 个人管理中心</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <!-- 引入 Font Awesome 图标 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="css/app.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="auth-page" id="app-body">
+    
+    <div class="app-container">
+        <!-- 侧边栏 (默认隐藏，登录后显示) -->
+        <aside class="sidebar hidden" id="sidebar">
+            <div class="logo">
+                <i class="fas fa-paper-plane"></i>
+                <span>灵信控制台</span>
+            </div>
+            <nav>
+                <ul>
+                    <li>
+                        <a href="#" id="nav-tokens" onclick="showSection('tokens')">
+                            <i class="fas fa-key"></i> 令牌管理
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" id="nav-usage" onclick="showSection('usage')">
+                            <i class="fas fa-chart-line"></i> 使用概览
+                        </a>
+                    </li>
+                    <li>
+                        <a href="#" id="nav-profile" onclick="showSection('profile')">
+                            <i class="fas fa-user-circle"></i> 个人资料
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+            <div style="margin-top: auto;">
+                <a href="#" onclick="logout()" style="color: #ef4444; display: flex; align-items: center; gap: 0.5rem; text-decoration: none; padding: 0.75rem 1rem;">
+                    <i class="fas fa-sign-out-alt"></i> 退出登录
+                </a>
+            </div>
+        </aside>
+
+        <!-- 主内容区 -->
+        <main class="content">
+            <!-- 登录注册模块 -->
+            <section id="auth-section">
+                <article id="login-form">
+                    <header><h5>欢迎回来</h5></header>
+                    <form onsubmit="handleLogin(event)">
+                        <label>用户名
+                            <input type="text" name="username" placeholder="请输入用户名" required>
+                        </label>
+                        <label>密码
+                            <input type="password" name="password" placeholder="请输入密码" required>
+                        </label>
+                        <button type="submit" class="primary">登录管理中心</button>
+                        <p align="center"><small>还没有账号？ <a href="#" onclick="toggleAuth('register')">立即注册</a></small></p>
+                    </form>
+                </article>
+
+                <article id="register-form" class="hidden">
+                    <header><h5>创建管理账号</h5></header>
+                    <form onsubmit="handleRegister(event)">
+                        <input type="text" id="reg-username" placeholder="用户名" required>
+                        <input type="password" id="reg-password" placeholder="密码" required>
+                        <input type="text" id="reg-nickname" placeholder="昵称" required>
+                        <div style="display: flex; gap: 10px; align-items: flex-start;">
+                            <input type="email" id="reg-email" placeholder="邮箱" required style="margin-bottom: 0;">
+                            <button type="button" class="outline" onclick="sendEmailCode()" style="white-space: nowrap; width: auto; margin-bottom: 0;">获取验证码</button>
+                        </div>
+                        <input type="text" id="reg-code" placeholder="验证码" required>
+                        <button type="submit">完成注册</button>
+                        <p align="center"><small>已有账号？ <a href="#" onclick="toggleAuth('login')">返回登录</a></small></p>
+                    </form>
+                </article>
+            </section>
+
+            <!-- Token管理模块 -->
+            <section id="tokens-section" class="hidden">
+                <article>
+                    <header>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <h5>Agent 访问令牌</h5>
+                            <button class="primary" onclick="showGenerateTokenModal()" style="margin: 0; padding: 0.5rem 1rem;">
+                                <i class="fas fa-plus"></i> 生成令牌
+                            </button>
+                        </div>
+                    </header>
+                    <p style="color: #6b7280; font-size: 0.9rem;">
+                        您可以将生成的 Token 配置在第三方 Agent 中，使其能够代表您收发消息。
+                    </p>
+                    <div style="overflow-x: auto;">
+                        <table id="tokens-table">
+                            <thead>
+                                <tr>
+                                    <th>Agent 名称</th>
+                                    <th>Token</th>
+                                    <th>状态</th>
+                                    <th>过期时间</th>
+                                    <th style="text-align: right;">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tokens-tbody"></tbody>
+                        </table>
+                    </div>
+                </article>
+            </section>
+
+            <!-- 使用概览模块 -->
+            <section id="usage-section" class="hidden">
+                <article>
+                    <header>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <h5>Token 消耗统计</h5>
+                            <select id="usage-days" style="width: auto; margin: 0;" onchange="loadUsageStats()">
+                                <option value="3" selected>最近 3 天</option>
+                                <option value="7">最近 7 天</option>
+                                <option value="30">最近 30 天</option>
+                            </select>
+                        </div>
+                    </header>
+                    <div class="grid">
+                        <div class="chart-container" style="height: 300px;">
+                            <h6 align="center" style="font-size: 0.9rem; color: #6b7280; margin-bottom: 0.5rem;">每日消耗趋势</h6>
+                            <div style="height: 250px; position: relative;">
+                                <canvas id="dailyChart"></canvas>
+                            </div>
+                        </div>
+                        <div class="chart-container" style="height: 300px;">
+                            <h6 align="center" style="font-size: 0.9rem; color: #6b7280; margin-bottom: 0.5rem;">工具消耗分布</h6>
+                            <div style="height: 250px; position: relative;">
+                                <canvas id="intentChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </article>
+            </section>
+
+            <!-- 个人资料模块 -->
+            <section id="profile-section" class="hidden">
+                <article>
+                    <header><h5>账号个人资料</h5></header>
+                    <form onsubmit="handleUpdateProfile(event)">
+                        <div class="grid">
+                            <label>用户名
+                                <input type="text" id="profile-username" name="username" readonly disabled>
+                            </label>
+                            <label>昵称
+                                <input type="text" id="profile-nickname" name="nickname" required>
+                            </label>
+                        </div>
+                        <label>个性签名
+                            <textarea id="profile-signature" name="signature" rows="2" placeholder="写点什么介绍自己..."></textarea>
+                        </label>
+                        <div class="grid">
+                            <label>性别
+                                <select id="profile-gender" name="gender">
+                                    <option value="0">保密</option>
+                                    <option value="1">男</option>
+                                    <option value="2">女</option>
+                                </select>
+                            </label>
+                            <label>绑定邮箱
+                                <div style="display: flex; gap: 10px; align-items: flex-start;">
+                                    <input type="email" id="profile-email" readonly disabled style="margin-bottom: 0;">
+                                    <button type="button" class="outline" onclick="showChangeEmailModal()" style="white-space: nowrap; width: auto; margin-bottom: 0;">换绑</button>
+                                </div>
+                            </label>
+                        </div>
+                        <footer style="text-align: right; padding-top: 0;">
+                            <button type="submit" id="btn-save-profile" style="margin-bottom: 0;">保存资料</button>
+                        </footer>
+                    </form>
+                </article>
+            </section>
+        </main>
+    </div>
+
+    <!-- 弹窗：生成Token -->
+    <dialog id="token-modal">
+        <article style="max-width: 500px; width: 90%;">
+            <header>
+                <a href="#close" aria-label="Close" class="close" onclick="closeTokenModal()"></a>
+                <h5>生成新访问令牌</h5>
+            </header>
+            <form onsubmit="handleGenerateToken(event)">
+                <label>应用名称 (Agent)
+                    <input type="text" name="agentName" placeholder="例如: Dify 智能助手" required>
+                </label>
+                <div class="grid">
+                    <label>有效期 (天)
+                        <input type="number" name="expireDays" placeholder="留空为永久有效">
+                    </label>
+                    <div style="visibility: hidden;">placeholder</div>
+                </div>
+                
+                <fieldset>
+                    <legend><strong>授权范围 (Scopes)</strong></legend>
+                    <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 0 1rem;">
+                        <label><input type="checkbox" name="scope" value="msg:send" checked> 发送消息</label>
+                        <label><input type="checkbox" name="scope" value="msg:read"> 读取消息</label>
+                        <label><input type="checkbox" name="scope" value="contact:read" checked> 关系链读取</label>
+                        <label><input type="checkbox" name="scope" value="user:profile" checked> 个人资料</label>
+                    </div>
+                    <small style="color: #6b7280;">提示：请仅授予 Agent 必要的权限以保护隐私。</small>
+                </fieldset>
+
+                <footer>
+                    <div style="display: flex; justify-content: flex-end; gap: 1rem;">
+                        <button type="button" class="secondary outline" onclick="closeTokenModal()" style="margin: 0; width: auto; min-width: 100px;">取消</button>
+                        <button type="submit" style="margin: 0; width: auto; min-width: 100px;">立即生成</button>
+                    </div>
+                </footer>
+            </form>
+        </article>
+    </dialog>
+
+    <!-- 弹窗：修改邮箱 -->
+    <dialog id="email-modal">
+        <article style="max-width: 500px; width: 90%;">
+            <header>
+                <a href="#close" aria-label="Close" class="close" onclick="closeEmailModal()"></a>
+                <h5>修改绑定邮箱</h5>
+            </header>
+            <form onsubmit="handleUpdateEmail(event)">
+                <label>验证当前密码
+                    <input type="password" id="email-old-pwd" placeholder="请输入当前登录密码" required>
+                </label>
+                <label>新邮箱地址
+                    <input type="email" id="email-new-addr" placeholder="请输入新邮箱" required>
+                </label>
+                <label>邮箱验证码
+                    <div style="display: flex; gap: 10px; align-items: flex-start;">
+                        <input type="text" id="email-new-code" placeholder="6位验证码" required style="margin-bottom: 0;">
+                        <button type="button" id="btn-send-email-code" onclick="sendChangeEmailCode()" style="white-space: nowrap; width: auto; margin-bottom: 0;">获取验证码</button>
+                    </div>
+                </label>
+                <footer>
+                    <div style="display: flex; justify-content: flex-end; gap: 1rem;">
+                        <button type="button" class="secondary outline" onclick="closeEmailModal()" style="margin: 0; width: auto; min-width: 100px;">取消</button>
+                        <button type="submit" style="margin: 0; width: auto; min-width: 100px;">确认更换</button>
+                    </div>
+                </footer>
+            </form>
+        </article>
+    </dialog>
+
+    <script src="js/app.js"></script>
+</body>
+</html>

@@ -2,14 +2,20 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'package:meta/meta.dart';
 import 'log_service.dart';
 
 class WebSocketService {
   WebSocketService._();
 
-  static final WebSocketService instance = WebSocketService._();
+  static WebSocketService instance = WebSocketService._();
 
   factory WebSocketService() => instance;
+
+  @visibleForTesting
+  static void setMock(WebSocketService mock) {
+    instance = mock;
+  }
 
   WebSocket? _socket;
   String? _token;

@@ -1,0 +1,178 @@
+/* 
+ * 邻信 Linxin Console - Modern Theme
+ * Base on Pico CSS 2.0
+ */
+
+:root {
+    --primary: #10b981;
+    --primary-hover: #059669;
+    --primary-focus: rgba(16, 185, 129, 0.125);
+    --card-section-bg: #ffffff;
+    --sidebar-bg: #1f2937;
+    --sidebar-color: #f3f4f6;
+    --body-bg: #f9fafb;
+}
+
+body {
+    background-color: var(--body-bg);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* 布局结构 */
+.app-container {
+    display: flex;
+    flex: 1;
+}
+
+aside.sidebar {
+    width: 260px;
+    background: var(--sidebar-bg);
+    color: var(--sidebar-color);
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 4px 0 10px rgba(0,0,0,0.05);
+    z-index: 100;
+}
+
+aside.sidebar .logo {
+    font-size: 1.25rem;
+    font-weight: 800;
+    margin-bottom: 2.5rem;
+    color: var(--primary);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+aside.sidebar nav ul {
+    flex-direction: column;
+}
+
+aside.sidebar nav ul li {
+    padding: 0;
+    margin-bottom: 0.5rem;
+}
+
+aside.sidebar nav ul li a {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    color: #9ca3af;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+
+aside.sidebar nav ul li a:hover,
+aside.sidebar nav ul li a.active {
+    background: rgba(255,255,255,0.1);
+    color: white;
+}
+
+aside.sidebar nav ul li a.active {
+    color: var(--primary);
+    background: rgba(16, 185, 129, 0.1);
+}
+
+main.content {
+    flex: 1;
+    padding: 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+/* 登录页居中 */
+body.auth-page {
+    justify-content: center;
+    align-items: center;
+}
+
+body.auth-page main.content {
+    max-width: 450px;
+}
+
+/* 卡片样式增强 */
+article {
+    border: none;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    border-radius: 1rem;
+    background: white;
+    margin-bottom: 2rem;
+}
+
+article header {
+    background: transparent;
+    border-bottom: 1px solid #f3f4f6;
+    padding: 1.25rem 1.5rem;
+}
+
+article header h5 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #111827;
+}
+
+/* 表格优化 */
+table {
+    margin-top: 1rem;
+}
+
+table thead th {
+    background: #f9fafb;
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #6b7280;
+    border-bottom: 2px solid #f3f4f6;
+}
+
+/* 状态标签 */
+mark.status {
+    padding: 0.25rem 0.6rem;
+    border-radius: 2rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+/* 统计图表容器 */
+.chart-container {
+    padding: 1rem;
+    height: 350px; /* 必须是固定高度或受限高度 */
+    position: relative;
+}
+
+/* 按钮样式微调 */
+button {
+    border-radius: 0.5rem;
+    font-weight: 600;
+    transition: transform 0.1s;
+}
+
+button:active {
+    transform: scale(0.98);
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+    .app-container {
+        flex-direction: column;
+    }
+    aside.sidebar {
+        width: 100%;
+        padding: 1rem;
+    }
+    aside.sidebar .logo {
+        margin-bottom: 1rem;
+    }
+}
+
+/* 隐藏部分 */
+.hidden {
+    display: none !important;
+}

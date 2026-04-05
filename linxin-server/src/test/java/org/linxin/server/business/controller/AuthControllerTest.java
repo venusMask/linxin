@@ -16,6 +16,7 @@ import org.linxin.server.business.mapper.UserMapper;
 import org.linxin.server.business.model.request.UserLoginRequest;
 import org.linxin.server.business.model.request.UserRegisterRequest;
 import org.linxin.server.business.service.IAgentTokenService;
+import org.linxin.server.business.service.IEmailVerificationService;
 import org.linxin.server.business.service.IUserService;
 import org.linxin.server.business.vo.UserVO;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +35,8 @@ public class AuthControllerTest {
 
     @MockBean
     private IUserService userService;
+    @MockBean
+    private IEmailVerificationService emailVerificationService;
     @MockBean
     private JwtService jwtService;
     @MockBean
@@ -56,6 +59,8 @@ public class AuthControllerTest {
         request.setUsername("test");
         request.setPassword("password123");
         request.setNickname("nick");
+        request.setEmail("test@example.com");
+        request.setVerificationCode("123456");
 
         when(userService.register(any())).thenReturn(new User());
         when(userConverter.toVO(any())).thenReturn(new UserVO());

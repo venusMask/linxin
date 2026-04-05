@@ -64,6 +64,7 @@ class DataService extends ChangeNotifier {
     final senderId = messageData['senderId']?.toString();
     final senderType = messageData['senderType']?.toString();
     final isAi = messageData['isAi'] as bool? ?? messageData['is_ai'] as bool? ?? false;
+    final senderUserType = messageData['userType'] as int? ?? 0;
     final currentUserId = AuthService().currentUser?.id.toString();
 
     // 如果是 AI 代发的，且发送者是自己，则标记为 isMe
@@ -73,7 +74,23 @@ class DataService extends ChangeNotifier {
     if (chat == null) {
       // 尝试通过发送者或接收者 ID 创建会话
       final peerId = isMe ? messageData['receiverId']?.toString() : senderId;
-      if (peerId != null) {
+      
+      // 如果发送者是系统AI
+      if (senderUserType == 1) {
+        // AI 助手的特殊处理
+        chat = createChat(Friend(
+          id: peerId!,
+          name: messageData['senderNickname']?.toString() ?? 'AI 助手',
+          avatar: messageData['senderAvatar']?.toString() ?? '',
+          userType: 1,
+        ));
+        // 更新会话 ID 为服务器返回的 ID
+        final index = _chats.indexWhere((c) => c.friend?.userType == 1);
+        if (index != -1) {
+          _chats[index] = _chats[index].copyWith(id: conversationId);
+          chat = _chats[index];
+        }
+      } else if (peerId != null) {
         await refreshFriends();
         final friend = getFriendById(peerId);
         if (friend != null) {
@@ -241,6 +258,19 @@ class DataService extends ChangeNotifier {
       return _friends.firstWhere((friend) => friend.id == id);
     } catch (e) {
       return null;
+    }
+  }
+
+  Friend? getAiAssistant() {
+    try {
+      return _friends.firstWhere((f) => f.userType == 1);
+    } catch (e) {
+      // 如果好友列表里没同步到，看看会话列表里有没有
+      try {
+        return _chats.firstWhere((c) => c.friend?.userType == 1).friend;
+      } catch (e) {
+        return null;
+      }
     }
   }
 

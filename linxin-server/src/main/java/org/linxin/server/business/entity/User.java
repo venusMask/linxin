@@ -28,6 +28,13 @@ public class User {
 
     private Integer status;
 
+    private Integer passwordVersion;
+
+    /**
+     * 用户类型: 0-普通用户, 1-系统AI
+     */
+    private Integer userType;
+
     private LocalDateTime lastLoginTime;
 
     private String lastLoginIp;

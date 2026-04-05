@@ -50,7 +50,16 @@ public class AgentController {
             @RequestBody Map<String, Object> request) {
         String agentName = (String) request.get("agentName");
         String scopes = (String) request.get("scopes");
-        Integer expireDays = (Integer) request.get("expireDays");
+
+        Object expireDaysObj = request.get("expireDays");
+        Integer expireDays = null;
+        if (expireDaysObj != null && !expireDaysObj.toString().isEmpty()) {
+            try {
+                expireDays = Integer.valueOf(expireDaysObj.toString());
+            } catch (NumberFormatException e) {
+                // 忽略格式错误，默认为永久有效
+            }
+        }
 
         java.time.LocalDateTime expireTime = null;
         if (expireDays != null && expireDays > 0) {

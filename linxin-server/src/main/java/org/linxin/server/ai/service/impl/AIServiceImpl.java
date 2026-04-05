@@ -1,21 +1,14 @@
 package org.linxin.server.ai.service.impl;
 
-import jakarta.annotation.PostConstruct;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.linxin.server.ai.adapter.AIModelAdapter;
-import org.linxin.server.ai.adapter.FailoverAIModelAdapter;
-import org.linxin.server.ai.adapter.OpenAIAdapter;
-import org.linxin.server.ai.config.AIConfig;
-import org.linxin.server.ai.config.AIProviderConfig;
+import org.linxin.server.ai.core.agent.AIAgent;
+import org.linxin.server.ai.core.dto.ModelResponse;
+import org.linxin.server.ai.core.model.LLMModel;
+import org.linxin.server.ai.core.tool.ToolProvider;
 import org.linxin.server.ai.dto.ChatRequest;
 import org.linxin.server.ai.dto.ChatResponse;
 import org.linxin.server.ai.service.AIService;
-import org.linxin.server.ai.tools.AITool;
-import org.linxin.server.ai.tools.ToolsConfig;
 import org.springframework.stereotype.Service;
 
 @Slf4j
@@ -23,68 +16,53 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class AIServiceImpl implements AIService {
 
-    private final AIConfig aiConfig;
-    private final ToolsConfig toolsConfig;
+    private final AIAgent aiAgent;
+    private final ToolProvider toolProvider;
+    private final LLMModel activeModel;
     private final org.linxin.server.ai.mapper.AIUsageLogMapper usageLogMapper;
-    private AIModelAdapter activeAdapter;
-
-    @PostConstruct
-    public void init() {
-        List<AIModelAdapter> adapters = new ArrayList<>();
-
-        // 1. 处理多 Provider 配置
-        List<AIProviderConfig> providers = aiConfig.getProviders();
-        if (providers != null && !providers.isEmpty()) {
-            List<AIProviderConfig> sortedProviders = providers.stream()
-                    .sorted(Comparator.comparing(AIProviderConfig::getPriority).reversed())
-                    .toList();
-
-            for (AIProviderConfig p : sortedProviders) {
-                adapters.add(new OpenAIAdapter(p.getName(), p.getBaseUrl(), p.getApiKey(), p.getModel(),
-                        p.getTemperature()));
-                log.info("加载 AI Provider: {}", p.getName());
-            }
-        }
-
-        // 2. 向后兼容处理单点配置
-        if (aiConfig.getBaseUrl() != null && !aiConfig.getBaseUrl().isEmpty()) {
-            adapters.add(new OpenAIAdapter("Default", aiConfig.getBaseUrl(), aiConfig.getApiKey(), aiConfig.getModel(),
-                    aiConfig.getTemperature()));
-        }
-
-        this.activeAdapter = new FailoverAIModelAdapter(adapters);
-    }
 
     @Override
     public ChatResponse processUserInput(ChatRequest request) {
-        ChatResponse response = activeAdapter.chat(request.getContent(), toolsConfig.getTools());
+        log.info("Processing multi-step AI request for user: {}", request.getUserId());
 
-        // 异步记录消耗日志
-        if (response.getUsage() != null) {
-            final Long userId = request.getUserId();
-            final String provider = activeAdapter.getProviderName();
-            final String model = activeAdapter.getModelName();
-            final String intent = response.getIntent();
-            final ChatResponse.Usage usage = response.getUsage();
+        ModelResponse agentResult = aiAgent.run(request.getUserId(), request.getContent());
 
-            new Thread(() -> {
-                try {
-                    org.linxin.server.ai.entity.AIUsageLog logEntry = new org.linxin.server.ai.entity.AIUsageLog();
-                    logEntry.setUserId(userId);
-                    logEntry.setProviderName(provider);
-                    logEntry.setModelName(model);
-                    logEntry.setIntent(intent);
-                    logEntry.setPromptTokens(usage.getPromptTokens());
-                    logEntry.setCompletionTokens(usage.getCompletionTokens());
-                    logEntry.setTotalTokens(usage.getTotalTokens());
-                    usageLogMapper.insert(logEntry);
-                } catch (Exception e) {
-                    log.error("Failed to log AI usage", e);
-                }
-            }).start();
+        // 转换为旧的 DTO 结构以兼容前端
+        ChatResponse response = new ChatResponse();
+        response.setIntent(agentResult.hasToolCalls() ? "tool_call" : "chat");
+        response.setAiText(agentResult.getContent());
+        response.setReply(agentResult.getContent());
+
+        if (agentResult.getUsage() != null) {
+            ChatResponse.Usage legacyUsage = new ChatResponse.Usage();
+            legacyUsage.setPromptTokens(agentResult.getUsage().getPromptTokens());
+            legacyUsage.setCompletionTokens(agentResult.getUsage().getCompletionTokens());
+            legacyUsage.setTotalTokens(agentResult.getUsage().getTotalTokens());
+            response.setUsage(legacyUsage);
+
+            // 异步记录日志
+            logUsage(request.getUserId(), agentResult.getUsage());
         }
 
         return response;
+    }
+
+    private void logUsage(Long userId, ModelResponse.Usage usage) {
+        new Thread(() -> {
+            try {
+                org.linxin.server.ai.entity.AIUsageLog logEntry = new org.linxin.server.ai.entity.AIUsageLog();
+                logEntry.setUserId(userId);
+                logEntry.setProviderName(activeModel.getProviderName());
+                logEntry.setModelName(activeModel.getModelName());
+                logEntry.setIntent("agent_workflow");
+                logEntry.setPromptTokens(usage.getPromptTokens());
+                logEntry.setCompletionTokens(usage.getCompletionTokens());
+                logEntry.setTotalTokens(usage.getTotalTokens());
+                usageLogMapper.insert(logEntry);
+            } catch (Exception e) {
+                log.error("Failed to log AI usage", e);
+            }
+        }).start();
     }
 
     @Override
@@ -93,12 +71,16 @@ public class AIServiceImpl implements AIService {
     }
 
     @Override
-    public List<AITool> getAvailableTools() {
-        return toolsConfig.getTools();
+    public String getToolsVersion() {
+        return "2.0.0-Agent";
     }
 
     @Override
-    public String getToolsVersion() {
-        return toolsConfig.getVersion();
+    public java.util.Map<String, Object> getUsageStatistics(Long userId, Integer days) {
+        java.time.LocalDateTime startTime = java.time.LocalDateTime.now().minusDays(days != null ? days : 3);
+        java.util.Map<String, Object> stats = new java.util.HashMap<>();
+        stats.put("daily", usageLogMapper.selectDailyUsage(userId, startTime));
+        stats.put("intents", usageLogMapper.selectIntentUsage(userId, startTime));
+        return stats;
     }
 }

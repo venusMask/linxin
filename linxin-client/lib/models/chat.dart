@@ -92,7 +92,7 @@ class Chat {
 
   factory Chat.fromJson(Map<String, dynamic> json) {
     return Chat(
-      id: json['id'] as String,
+      id: json['id']?.toString() ?? '',
       friend: json['friend'] != null
           ? Friend.fromJson(json['friend'] as Map<String, dynamic>)
           : null,
@@ -103,27 +103,30 @@ class Chat {
               ?.map((m) => Message.fromJson(m as Map<String, dynamic>))
               .toList() ??
           [],
-      lastTime: DateTime.parse(json['lastTime'] as String),
+      lastTime: json['lastTime'] != null 
+          ? DateTime.parse(json['lastTime'] as String)
+          : DateTime.now(),
       unreadCount: json['unreadCount'] as int? ?? 0,
-      type: json['type'] == 1 ? ChatType.group : ChatType.private,
-      lastMessage: json['lastMessage'] as String?,
-      groupName: json['groupName'] as String?,
-      groupAvatar: json['groupAvatar'] as String?,
+      type: (json['type'] == 1) ? ChatType.group : ChatType.private,
+      lastMessage: json['lastMessage']?.toString(),
+      groupName: json['groupName']?.toString(),
+      groupAvatar: json['groupAvatar']?.toString(),
     );
   }
 
   factory Chat.fromConversationJson(Map<String, dynamic> json) {
-    final type = json['type'] as int? ?? 0;
+    final rawType = json['type'];
+    final int type = rawType is int ? rawType : int.tryParse(rawType?.toString() ?? '0') ?? 0;
     final isGroup = type == 1;
 
     if (isGroup) {
       return Chat(
-        id: json['id'].toString(),
+        id: json['id']?.toString() ?? '',
         group: json['groupId'] != null
             ? Group(
-                id: json['groupId'].toString(),
-                name: json['peerNickname'] as String? ?? '群聊',
-                avatar: json['peerAvatar'] as String? ?? '',
+                id: json['groupId']?.toString() ?? '',
+                name: json['peerNickname']?.toString() ?? '群聊',
+                avatar: json['peerAvatar']?.toString() ?? '',
                 ownerId: 0,
               )
             : null,
@@ -133,17 +136,17 @@ class Chat {
             : DateTime.now(),
         unreadCount: json['unreadCount'] as int? ?? 0,
         type: ChatType.group,
-        lastMessage: json['lastMessageContent'] as String?,
-        groupName: json['peerNickname'] as String?,
-        groupAvatar: json['peerAvatar'] as String?,
+        lastMessage: json['lastMessageContent']?.toString(),
+        groupName: json['peerNickname']?.toString(),
+        groupAvatar: json['peerAvatar']?.toString(),
       );
     } else {
       return Chat(
-        id: json['id'] as String,
+        id: json['id']?.toString() ?? '',
         friend: Friend(
-          id: json['peerId'].toString(),
-          name: json['peerNickname'] as String? ?? '未知',
-          avatar: json['peerAvatar'] as String? ?? '',
+          id: json['peerId']?.toString() ?? '',
+          name: json['peerNickname']?.toString() ?? '未知',
+          avatar: json['peerAvatar']?.toString() ?? '',
         ),
         messages: [],
         lastTime: json['lastMessageTime'] != null
@@ -151,7 +154,7 @@ class Chat {
             : DateTime.now(),
         unreadCount: json['unreadCount'] as int? ?? 0,
         type: ChatType.private,
-        lastMessage: json['lastMessageContent'] as String?,
+        lastMessage: json['lastMessageContent']?.toString(),
       );
     }
   }

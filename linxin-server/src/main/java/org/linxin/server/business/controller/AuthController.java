@@ -11,15 +11,21 @@ import org.linxin.server.auth.JwtService;
 import org.linxin.server.business.converter.UserConverter;
 import org.linxin.server.business.entity.User;
 import org.linxin.server.business.model.request.SendEmailCodeRequest;
+import org.linxin.server.business.model.request.UpdateEmailRequest;
+import org.linxin.server.business.model.request.UpdatePasswordRequest;
+import org.linxin.server.business.model.request.UpdateProfileRequest;
 import org.linxin.server.business.model.request.UserLoginRequest;
 import org.linxin.server.business.model.request.UserRegisterRequest;
-import org.linxin.server.business.model.request.VerifyEmailCodeRequest;
 import org.linxin.server.business.service.IEmailVerificationService;
 import org.linxin.server.business.service.IUserService;
 import org.linxin.server.business.vo.UserVO;
 import org.linxin.server.common.result.Result;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * insert into `users`(username, nickname, password, status, user_type) values ('test_admin', '测试',
+ * '$2a$10$8.UnVuG9HHgffUDAlk8q2OuVGkqEnLPzDbaW2CLvIDJAlBDW6E7ve', 1, 0)
+ */
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor
@@ -42,7 +48,7 @@ public class AuthController {
     @Operation(summary = "用户登录")
     public Result<Map<String, Object>> login(@Valid @RequestBody UserLoginRequest request) {
         User user = userService.login(request);
-        String token = jwtService.generateToken(user.getId(), user.getUsername());
+        String token = jwtService.generateToken(user.getId(), user.getUsername(), user.getPasswordVersion());
 
         Map<String, Object> data = new HashMap<>();
         data.put("token", token);
@@ -79,7 +85,32 @@ public class AuthController {
     @PostMapping("/email/send-code")
     @Operation(summary = "发送邮箱验证码")
     public Result<Void> sendEmailCode(@Valid @RequestBody SendEmailCodeRequest request) {
-        emailVerificationService.sendVerificationCode(request.getEmail());
+        String type = request.getType() != null ? request.getType() : "register";
+        emailVerificationService.sendVerificationCode(request.getEmail(), type);
+        return Result.success(null);
+    }
+
+    @PutMapping("/profile")
+    @Operation(summary = "更新个人资料")
+    public Result<Void> updateProfile(@RequestAttribute("userId") Long userId,
+            @RequestBody UpdateProfileRequest request) {
+        userService.updateProfile(userId, request);
+        return Result.success(null);
+    }
+
+    @PutMapping("/email")
+    @Operation(summary = "更换绑定邮箱")
+    public Result<Void> updateEmail(@RequestAttribute("userId") Long userId,
+            @Valid @RequestBody UpdateEmailRequest request) {
+        userService.updateEmail(userId, request);
+        return Result.success(null);
+    }
+
+    @PutMapping("/password")
+    @Operation(summary = "修改登录密码")
+    public Result<Void> updatePassword(@RequestAttribute("userId") Long userId,
+            @Valid @RequestBody UpdatePasswordRequest request) {
+        userService.updatePassword(userId, request);
         return Result.success(null);
     }
 }

@@ -25,4 +25,5 @@ public class MessageVO {
     private Long sequenceId;
     private Boolean isAi;
     private String senderType;
+    private Integer userType; // 发送者用户类型
 }

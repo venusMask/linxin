@@ -19,10 +19,11 @@ public class JwtService {
         this.authConfig = authConfig;
     }
 
-    public String generateToken(Long userId, String username) {
+    public String generateToken(Long userId, String username, Integer passwordVersion) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("userId", userId);
         claims.put("username", username);
+        claims.put("pwdVer", passwordVersion);
         return createToken(claims, username);
     }
 
@@ -53,6 +54,10 @@ public class JwtService {
 
     public String extractUsername(String token) {
         return extractAllClaims(token).getSubject();
+    }
+
+    public Integer extractPasswordVersion(String token) {
+        return extractAllClaims(token).get("pwdVer", Integer.class);
     }
 
     public boolean isTokenExpired(String token) {

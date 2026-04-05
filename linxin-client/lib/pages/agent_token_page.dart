@@ -38,47 +38,57 @@ class _AgentTokenPageState extends State<AgentTokenPage> {
   Future<void> _generateNewToken() async {
     final nameController = TextEditingController();
     int selectedDays = 30; // 默认30天
+    List<String> selectedScopes = ['msg:send', 'contact:read', 'user:profile'];
 
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
           title: const Text('生成新令牌'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Agent 名称', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              TextField(
-                controller: nameController,
-                decoration: const InputDecoration(
-                  hintText: '如: OpenClaw',
-                  border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Agent 名称', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(
+                    hintText: '如: OpenClaw',
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                  autofocus: true,
                 ),
-                autofocus: true,
-              ),
-              const SizedBox(height: 20),
-              const Text('有效期', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              DropdownButtonFormField<int>(
-                initialValue: selectedDays,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                const SizedBox(height: 20),
+                const Text('有效期', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<int>(
+                  initialValue: selectedDays,
+                  decoration: const InputDecoration(
+                    border: OutlineInputBorder(),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 7, child: Text('7 天')),
+                    DropdownMenuItem(value: 30, child: Text('30 天')),
+                    DropdownMenuItem(value: 90, child: Text('90 天')),
+                    DropdownMenuItem(value: 0, child: Text('永久有效')),
+                  ],
+                  onChanged: (val) {
+                    if (val != null) setDialogState(() => selectedDays = val);
+                  },
                 ),
-                items: const [
-                  DropdownMenuItem(value: 7, child: Text('7 天')),
-                  DropdownMenuItem(value: 30, child: Text('30 天')),
-                  DropdownMenuItem(value: 90, child: Text('90 天')),
-                  DropdownMenuItem(value: 0, child: Text('永久有效')),
-                ],
-                onChanged: (val) {
-                  if (val != null) setDialogState(() => selectedDays = val);
-                },
-              ),
-            ],
+                const SizedBox(height: 20),
+                const Text('权限范围 (Scopes)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                _buildScopeItem('msg:send', '发送消息', selectedScopes, setDialogState),
+                _buildScopeItem('msg:read', '读取消息', selectedScopes, setDialogState),
+                _buildScopeItem('contact:read', '关系链读取', selectedScopes, setDialogState),
+                _buildScopeItem('user:profile', '个人资料', selectedScopes, setDialogState),
+              ],
+            ),
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
@@ -86,6 +96,7 @@ class _AgentTokenPageState extends State<AgentTokenPage> {
               onPressed: () => Navigator.pop(context, {
                 'name': nameController.text.trim(),
                 'days': selectedDays,
+                'scopes': selectedScopes.join(','),
               }),
               style: ElevatedButton.styleFrom(backgroundColor: Colors.green[600], foregroundColor: Colors.white),
               child: const Text('生成'),
@@ -100,7 +111,7 @@ class _AgentTokenPageState extends State<AgentTokenPage> {
         await HttpService().post('/api/agent/tokens/generate', data: {
           'agentName': result['name'],
           'expireDays': result['days'],
-          'scopes': 'msg:send,contact:resolve',
+          'scopes': result['scopes'],
         });
         _loadTokens();
       } catch (e) {
@@ -143,6 +154,26 @@ class _AgentTokenPageState extends State<AgentTokenPage> {
     Clipboard.setData(ClipboardData(text: text));
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('令牌已复制到剪贴板')),
+    );
+  }
+
+  Widget _buildScopeItem(String value, String label, List<String> selected, StateSetter setDialogState) {
+    final bool isChecked = selected.contains(value);
+    return CheckboxListTile(
+      value: isChecked,
+      title: Text(label, style: const TextStyle(fontSize: 14)),
+      controlAffinity: ListTileControlAffinity.leading,
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      onChanged: (bool? val) {
+        setDialogState(() {
+          if (val == true) {
+            selected.add(value);
+          } else {
+            selected.remove(value);
+          }
+        });
+      },
     );
   }
 
@@ -261,11 +292,11 @@ class _AgentTokenPageState extends State<AgentTokenPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '创建时间: ${tokenObj['createTime']?.substring(0, 10) ?? ""}',
+                    '创建时间: ${tokenObj['createTime']?.replaceAll('T', ' ').substring(0, 16) ?? ""}',
                     style: const TextStyle(fontSize: 11, color: Colors.grey),
                   ),
                   Text(
-                    expireTime == null ? '永久有效' : '过期时间: ${expireTime.substring(0, 10)}',
+                    expireTime == null ? '永久有效' : '过期时间: ${expireTime.replaceAll('T', ' ').substring(0, 16)}',
                     style: TextStyle(
                       fontSize: 11, 
                       color: expireTime == null ? Colors.blue[400] : Colors.orange[400],

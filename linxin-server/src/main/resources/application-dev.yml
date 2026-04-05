@@ -4,7 +4,7 @@ spring:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/lin_xin?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true
     username: root
-    password: venus@911NASA
+    password: ${DB_PASSWORD}
     druid:
       initial-size: 5
       min-idle: 5
@@ -21,13 +21,15 @@ spring:
   flyway:
     enabled: true
     baseline-on-migrate: true
+    repair-on-migrate: true
     locations: classpath:db/migration/mysql
     encoding: UTF-8
   mail:
     host: smtp.qq.com
     port: 587
-    username: your-email@qq.com
-    password: your-email-password
+    username: 2917667033@qq.com
+    password: ${MAIL_PASSWORD}
+    default-encoding: UTF-8
     properties:
       mail:
         smtp:
@@ -45,30 +47,30 @@ ai:
     # 阿里云百炼 - 首选旗舰模型
     - name: "Alibaba Qwen Max"
       baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1"
-      apiKey: "sk-d6d2cfd858574dd5a21610426030c900"
+      apiKey: ${AI_API_KEY}
       model: "qwen-max"
       priority: 10
 
-    # 阿里云百炼 - 次选增强模型 (作为 Max 的备份)
-    - name: "Alibaba Qwen Plus"
-      baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1"
-      apiKey: "sk-d6d2cfd858574dd5a21610426030c900"
-      model: "qwen-plus"
-      priority: 9
-
-    # 阿里云百炼 - 基础快速模型 (成本最低，最后保底)
-    - name: "Alibaba Qwen Turbo"
-      baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1"
-      apiKey: "sk-d6d2cfd858574dd5a21610426030c900"
-      model: "qwen-turbo"
-      priority: 8
-
-    # 火山引擎 - 跨厂商备份
-    - name: "Volcengine Doubao"
-      baseUrl: "https://ark.cn-beijing.volces.com/api/v3"
-      apiKey: "YOUR_VOLCENGINE_API_KEY"
-      model: "YOUR_ENDPOINT_ID"
-      priority: 5
+#    # 阿里云百炼 - 次选增强模型 (作为 Max 的备份)
+#    - name: "Alibaba Qwen Plus"
+#      baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+#      apiKey: ${AI_API_KEY}
+#      model: "qwen-plus"
+#      priority: 9
+#
+#    # 阿里云百炼 - 基础快速模型 (成本最低，最后保底)
+#    - name: "Alibaba Qwen Turbo"
+#      baseUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+#      apiKey: "sk-d6d2cfd858574dd5a21610426030c900"
+#      model: "qwen-turbo"
+#      priority: 8
+#
+#    # 火山引擎 - 跨厂商备份
+#    - name: "Volcengine Doubao"
+#      baseUrl: "https://ark.cn-beijing.volces.com/api/v3"
+#      apiKey: "YOUR_VOLCENGINE_API_KEY"
+#      model: "YOUR_ENDPOINT_ID"
+#      priority: 5
   temperature: 0.7
 
 websocket:

@@ -40,20 +40,54 @@ public class FriendServiceImpl extends ServiceImpl<FriendMapper, Friend> impleme
             wrapper.and(w -> w.like(Friend::getFriendNickname, keyword).or().like(Friend::getTags, keyword));
         }
         IPage<Friend> friendPage = friendMapper.selectPage(page, wrapper);
-        return friendPage.convert(f -> {
+
+        // 如果是第一页，且没有搜索关键词，或者关键词匹配 AI，则手动加入系统 AI
+        List<FriendVO> records = friendPage.getRecords().stream().map(f -> {
             FriendVO vo = new FriendVO();
+            vo.setId(f.getId());
+            vo.setUserId(f.getUserId());
             vo.setFriendId(f.getFriendId());
             vo.setFriendNickname(f.getFriendNickname());
+            vo.setFriendGroup(f.getFriendGroup());
             vo.setTags(f.getTags());
+            vo.setCreateTime(f.getCreateTime());
             User user = userMapper.selectById(f.getFriendId());
             if (user != null) {
                 vo.setUsername(user.getUsername());
                 vo.setAvatar(user.getAvatar());
+                vo.setUserStatus(user.getStatus());
+                vo.setSignature(user.getSignature());
+                vo.setUserType(user.getUserType());
                 if (vo.getFriendNickname() == null)
                     vo.setFriendNickname(user.getNickname());
             }
             return vo;
-        });
+        }).collect(Collectors.toList());
+
+        if (pageNum == 1 && (keyword == null || keyword.isEmpty() || "AI".contains(keyword.toUpperCase())
+                || "助手".contains(keyword))) {
+            User aiUser = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUserType, 1).last("LIMIT 1"));
+            if (aiUser != null) {
+                // 检查是否已经在列表中（万一用户真的手动加了它）
+                boolean exists = records.stream().anyMatch(f -> aiUser.getId().equals(f.getFriendId()));
+                if (!exists) {
+                    FriendVO aiVo = new FriendVO();
+                    aiVo.setFriendId(aiUser.getId());
+                    aiVo.setFriendNickname(aiUser.getNickname());
+                    aiVo.setUsername(aiUser.getUsername());
+                    aiVo.setAvatar(aiUser.getAvatar());
+                    aiVo.setUserStatus(aiUser.getStatus());
+                    aiVo.setSignature("我是您的AI智能助手");
+                    aiVo.setUserType(1);
+                    records.add(0, aiVo);
+                }
+            }
+        }
+
+        IPage<FriendVO> voPage = new Page<>(pageNum, pageSize,
+                friendPage.getTotal() + (records.size() > friendPage.getRecords().size() ? 1 : 0));
+        voPage.setRecords(records);
+        return voPage;
     }
 
     @Override

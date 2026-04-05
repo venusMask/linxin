@@ -1,9 +1,19 @@
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
+import 'package:meta/meta.dart';
 import '../config/test_config.dart';
 import 'log_service.dart';
 
 class DatabaseService {
+  static DatabaseService _instance = DatabaseService._internal();
+  factory DatabaseService() => _instance;
+  DatabaseService._internal();
+
+  @visibleForTesting
+  static void setMock(DatabaseService mock) {
+    _instance = mock;
+  }
+
   static Database? _database;
   static const int _dbVersion = 1;
 

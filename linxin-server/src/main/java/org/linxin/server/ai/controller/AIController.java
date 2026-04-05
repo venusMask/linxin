@@ -1,12 +1,10 @@
 package org.linxin.server.ai.controller;
 
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.linxin.server.ai.dto.ChatRequest;
 import org.linxin.server.ai.dto.ChatResponse;
 import org.linxin.server.ai.dto.ModifyParamsRequest;
 import org.linxin.server.ai.service.AIService;
-import org.linxin.server.ai.tools.AITool;
 import org.linxin.server.common.result.Result;
 import org.springframework.web.bind.annotation.*;
 
@@ -31,14 +29,14 @@ public class AIController {
         return Result.success(response);
     }
 
-    @GetMapping("/tools")
-    public Result<List<AITool>> getTools() {
-        List<AITool> tools = aiService.getAvailableTools();
-        return Result.success(tools);
-    }
-
     @GetMapping("/tools/version")
     public Result<String> getToolsVersion() {
         return Result.success(aiService.getToolsVersion());
+    }
+
+    @GetMapping("/usage")
+    public Result<java.util.Map<String, Object>> getUsage(@RequestAttribute("userId") Long userId,
+            @RequestParam(required = false, defaultValue = "3") Integer days) {
+        return Result.success(aiService.getUsageStatistics(userId, days));
     }
 }
