@@ -39,15 +39,17 @@ class _UserDetailsPageState extends State<UserDetailsPage> {
         foregroundColor: Colors.black,
       ),
       extendBodyBehindAppBar: true,
-      body: Column(
-        children: [
-          _buildHeader(),
-          const SizedBox(height: 24),
-          _buildInfoList(),
-          const Spacer(),
-          _buildActionButtons(context),
-          const SizedBox(height: 40),
-        ],
+      body: SingleChildScrollView(
+        child: Column(
+          children: [
+            _buildHeader(),
+            const SizedBox(height: 24),
+            _buildInfoList(),
+            const SizedBox(height: 60), // 代替 Spacer，提供一定间距
+            _buildActionButtons(context),
+            const SizedBox(height: 40),
+          ],
+        ),
       ),
     );
   }

@@ -32,6 +32,7 @@ public class UserServiceImpl implements IUserService {
     private final PasswordEncoder passwordEncoder;
     private final UserConverter userConverter;
     private final IEmailVerificationService emailVerificationService;
+    private final org.linxin.server.module.contact.service.IFriendService friendService;
 
     @PostConstruct
     public void init() {
@@ -88,6 +89,14 @@ public class UserServiceImpl implements IUserService {
         user.setGender(0);
         user.setStatus(1);
         userMapper.insert(user);
+
+        // 注册成功后，自动添加系统 AI 助手为好友
+        try {
+            friendService.addSystemFriend(user.getId(), 1L);
+        } catch (Exception e) {
+            log.error("Failed to add system AI friend for new user: {}", user.getId(), e);
+        }
+
         return user;
     }
 

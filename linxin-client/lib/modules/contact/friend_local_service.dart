@@ -1,3 +1,4 @@
+import 'package:sqflite/sqflite.dart';
 import 'package:lin_xin/modules/contact/friend.dart';
 import 'package:lin_xin/core/service/db_service.dart';
 
@@ -7,10 +8,11 @@ class FriendLocalService {
   FriendLocalService(this._dbService);
 
   Future<void> saveFriend(Friend friend) async {
-    await _dbService.insert('friends', {
+    final db = await _dbService.database;
+    await db.insert('friends', {
       'id': friend.id,
       'user_id': friend.userId,
-      'friend_id': friend.id, // 这里 id 通常就是 friendId
+      'friend_id': friend.friendId,
       'username': friend.username,
       'nickname': friend.name,
       'avatar': friend.avatar,
@@ -19,11 +21,11 @@ class FriendLocalService {
       'sequence_id': friend.sequenceId,
       'status': 1,
       'created_at': DateTime.now().toIso8601String(),
-    });
+    }, conflictAlgorithm: ConflictAlgorithm.replace);
   }
 
-  Future<void> deleteFriend(String friendId) async {
-    await _dbService.delete('friends', where: 'id = ?', whereArgs: [friendId]);
+  Future<void> deleteFriend(String friendshipId) async {
+    await _dbService.delete('friends', where: 'id = ?', whereArgs: [friendshipId]);
   }
 
   Future<List<Friend>> getAllFriends() async {
@@ -31,6 +33,7 @@ class FriendLocalService {
     return maps.map((map) {
       return Friend(
         id: map['id'],
+        friendId: map['friend_id'],
         userId: map['user_id'],
         username: map['username'],
         name: map['nickname'] ?? '未知',

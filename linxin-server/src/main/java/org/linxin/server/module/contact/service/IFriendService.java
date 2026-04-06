@@ -30,4 +30,6 @@ public interface IFriendService extends IService<Friend> {
     List<FriendVO> syncFriends(Long userId, Long lastSequenceId);
 
     List<Friend> resolveRecipient(Long userId, String recipientName);
+
+    void addSystemFriend(Long userId, Long systemUserId);
 }

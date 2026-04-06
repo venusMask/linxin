@@ -1,6 +1,7 @@
 class Friend {
-  final String id;
-  final String? userId;
+  final String id; // 关系记录 ID
+  final String friendId; // 好友用户 ID
+  final String? userId; // 所属用户 ID
   final String? username; // 灵信号
   final String name;
   final String avatar;
@@ -10,6 +11,7 @@ class Friend {
 
   Friend({
     required this.id,
+    String? friendId,
     this.userId,
     this.username,
     required this.name,
@@ -17,10 +19,11 @@ class Friend {
     this.tags = const [],
     this.userType = 0,
     this.sequenceId = 0,
-  });
+  }) : friendId = friendId ?? id;
 
   Friend copyWith({
     String? id,
+    String? friendId,
     String? userId,
     String? username,
     String? name,
@@ -31,6 +34,7 @@ class Friend {
   }) {
     return Friend(
       id: id ?? this.id,
+      friendId: friendId ?? this.friendId,
       userId: userId ?? this.userId,
       username: username ?? this.username,
       name: name ?? this.name,
@@ -44,6 +48,7 @@ class Friend {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'friendId': friendId,
       'userId': userId,
       'username': username,
       'name': name,
@@ -62,10 +67,11 @@ class Friend {
         : [];
 
     return Friend(
-      id: json['id']?.toString() ?? json['friendId']?.toString() ?? '',
+      id: json['id']?.toString() ?? '',
+      friendId: json['friendId']?.toString() ?? json['id']?.toString() ?? '',
       userId: json['userId']?.toString(),
       username: json['username'] as String? ?? json['friendUsername'] as String?,
-      name: json['name'] as String? ?? json['friendNickname'] as String? ?? '未知',
+      name: json['name'] as String? ?? json['nickname'] as String? ?? json['friendNickname'] as String? ?? '未知',
       avatar: json['avatar'] as String? ?? '',
       tags: tagsList,
       userType: json['userType'] as int? ?? 0,

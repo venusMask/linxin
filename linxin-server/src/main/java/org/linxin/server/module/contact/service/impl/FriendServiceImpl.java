@@ -7,7 +7,6 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
-import lombok.RequiredArgsConstructor;
 import org.linxin.server.module.contact.entity.Friend;
 import org.linxin.server.module.contact.entity.FriendApply;
 import org.linxin.server.module.contact.mapper.FriendApplyMapper;
@@ -24,13 +23,26 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-@RequiredArgsConstructor
 public class FriendServiceImpl extends ServiceImpl<FriendMapper, Friend> implements IFriendService {
 
     private final FriendMapper friendMapper;
     private final UserMapper userMapper;
     private final FriendApplyMapper friendApplyMapper;
     private final org.linxin.server.common.util.SnowflakeIdWorker snowflakeIdWorker;
+    private final org.linxin.server.websocket.WebSocketHandler webSocketHandler;
+
+    public FriendServiceImpl(
+            FriendMapper friendMapper,
+            UserMapper userMapper,
+            FriendApplyMapper friendApplyMapper,
+            org.linxin.server.common.util.SnowflakeIdWorker snowflakeIdWorker,
+            @org.springframework.context.annotation.Lazy org.linxin.server.websocket.WebSocketHandler webSocketHandler) {
+        this.friendMapper = friendMapper;
+        this.userMapper = userMapper;
+        this.friendApplyMapper = friendApplyMapper;
+        this.snowflakeIdWorker = snowflakeIdWorker;
+        this.webSocketHandler = webSocketHandler;
+    }
 
     private Long getNextSequenceId(Long userId) {
         return snowflakeIdWorker.nextId();
@@ -46,8 +58,7 @@ public class FriendServiceImpl extends ServiceImpl<FriendMapper, Friend> impleme
         }
         IPage<Friend> friendPage = friendMapper.selectPage(page, wrapper);
 
-        // 如果是第一页，且没有搜索关键词，或者关键词匹配 AI，则手动加入系统 AI
-        List<FriendVO> records = friendPage.getRecords().stream().map(f -> {
+        return friendPage.convert(f -> {
             FriendVO vo = new FriendVO();
             vo.setId(f.getId());
             vo.setUserId(f.getUserId());
@@ -63,51 +74,38 @@ public class FriendServiceImpl extends ServiceImpl<FriendMapper, Friend> impleme
                 vo.setUserStatus(user.getStatus());
                 vo.setSignature(user.getSignature());
                 vo.setUserType(user.getUserType());
+                vo.setNickname(user.getNickname());
                 if (vo.getFriendNickname() == null)
                     vo.setFriendNickname(user.getNickname());
             }
             return vo;
-        }).collect(Collectors.toList());
-
-        if (pageNum == 1 && (keyword == null || keyword.isEmpty() || "AI".contains(keyword.toUpperCase())
-                || "助手".contains(keyword))) {
-            User aiUser = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUserType, 1).last("LIMIT 1"));
-            if (aiUser != null) {
-                // 检查是否已经在列表中（万一用户真的手动加了它）
-                boolean exists = records.stream().anyMatch(f -> aiUser.getId().equals(f.getFriendId()));
-                if (!exists) {
-                    FriendVO aiVo = new FriendVO();
-                    aiVo.setId(aiUser.getId()); // 设置一个确定的 ID
-                    aiVo.setFriendId(aiUser.getId());
-                    aiVo.setFriendNickname("AI 助手");
-                    aiVo.setNickname("AI 助手");
-                    aiVo.setUsername(aiUser.getUsername());
-                    aiVo.setAvatar(aiUser.getAvatar());
-                    aiVo.setUserStatus(aiUser.getStatus());
-                    aiVo.setSignature("我是您的AI智能助手");
-                    aiVo.setUserType(1);
-                    aiVo.setSequenceId(0L); // 系统内置 AI 序列号为 0
-                    records.add(0, aiVo);
-                }
-            }
-        }
-
-        long total = friendPage.getTotal();
-        // 如果 records 长度超过数据库记录，说明手动添加了 AI 助手
-        if (records.size() > friendPage.getRecords().size()) {
-            total += 1;
-        }
-
-        Page<FriendVO> voPage = new Page<>(pageNum, pageSize, total);
-        voPage.setRecords(records);
-        return voPage;
+        });
     }
-
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void applyAddFriend(Long userId, FriendApplyRequest request) {
+        if (userId.equals(request.getFriendId())) {
+            throw new org.linxin.server.common.exception.BusinessException("不能添加自己为好友");
+        }
+
+        // 1. 检查是否已经是好友
+        if (isFriend(userId, request.getFriendId())) {
+            throw new org.linxin.server.common.exception.BusinessException("对方已经是您的好友");
+        }
+
+        // 2. 检查是否已经发送过申请且对方尚未处理 (status = 0)
+        LambdaQueryWrapper<FriendApply> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(FriendApply::getFromUserId, userId)
+                .eq(FriendApply::getToUserId, request.getFriendId())
+                .eq(FriendApply::getStatus, 0);
+        if (friendApplyMapper.selectCount(wrapper) > 0) {
+            throw new org.linxin.server.common.exception.BusinessException("申请已发送，请等待对方处理");
+        }
+
         User fromUser = userMapper.selectById(userId);
         FriendApply apply = new FriendApply();
+        // ... (保持后续插入逻辑)
+
         apply.setFromUserId(userId);
         apply.setToUserId(request.getFriendId());
         apply.setRemark(request.getRemark());
@@ -116,6 +114,12 @@ public class FriendServiceImpl extends ServiceImpl<FriendMapper, Friend> impleme
         apply.setStatus(0);
         apply.setReadStatus(0);
         friendApplyMapper.insert(apply);
+
+        // 通知接收方有新好友申请
+        java.util.Map<String, Object> dataApply = new java.util.HashMap<>();
+        dataApply.put("fromUserId", userId);
+        webSocketHandler.sendMessageToUser(request.getFriendId(),
+                new org.linxin.server.websocket.WebSocketMessage("friend_apply", dataApply));
     }
 
     @Override
@@ -145,6 +149,26 @@ public class FriendServiceImpl extends ServiceImpl<FriendMapper, Friend> impleme
 
         if (request.getStatus() == 1) { // 同意
             addFriendPair(apply.getFromUserId(), apply.getToUserId());
+
+            // 推送通知给双方，触发增量同步
+            java.util.Map<String, Object> data1 = new java.util.HashMap<>();
+            data1.put("status", 1);
+            data1.put("friendId", apply.getToUserId());
+            webSocketHandler.sendMessageToUser(apply.getFromUserId(),
+                    new org.linxin.server.websocket.WebSocketMessage("friend_handle", data1));
+
+            java.util.Map<String, Object> data2 = new java.util.HashMap<>();
+            data2.put("status", 1);
+            data2.put("friendId", apply.getFromUserId());
+            webSocketHandler.sendMessageToUser(apply.getToUserId(),
+                    new org.linxin.server.websocket.WebSocketMessage("friend_handle", data2));
+        } else {
+            // 拒绝申请也通知发起人
+            java.util.Map<String, Object> data3 = new java.util.HashMap<>();
+            data3.put("status", request.getStatus());
+            data3.put("friendId", apply.getToUserId());
+            webSocketHandler.sendMessageToUser(apply.getFromUserId(),
+                    new org.linxin.server.websocket.WebSocketMessage("friend_handle", data3));
         }
     }
 
@@ -153,21 +177,31 @@ public class FriendServiceImpl extends ServiceImpl<FriendMapper, Friend> impleme
             User u1 = userMapper.selectById(user1);
             User u2 = userMapper.selectById(user2);
 
-            Friend f1 = new Friend();
-            f1.setUserId(user1);
-            f1.setFriendId(user2);
-            f1.setFriendNickname(u2.getNickname());
-            f1.setStatus(1);
-            f1.setSequenceId(getNextSequenceId(user1));
-            friendMapper.insert(f1);
+            insertOrRestoreFriend(user1, user2, u2.getNickname());
+            insertOrRestoreFriend(user2, user1, u1.getNickname());
+        }
+    }
 
-            Friend f2 = new Friend();
-            f2.setUserId(user2);
-            f2.setFriendId(user1);
-            f2.setFriendNickname(u1.getNickname());
-            f2.setStatus(1);
-            f2.setSequenceId(getNextSequenceId(user2));
-            friendMapper.insert(f2);
+    private void insertOrRestoreFriend(Long userId, Long friendId, String friendNickname) {
+        // 使用自定义 Mapper 方法查询，包含逻辑删除的记录
+        Friend friend = friendMapper.selectByUserIdAndFriendId(userId, friendId);
+
+        if (friend != null) {
+            // 如果已存在（无论是 active 还是 deleted），更新为 active 状态
+            friend.setDeleted(0);
+            friend.setSequenceId(getNextSequenceId(userId));
+            friend.setFriendNickname(friendNickname);
+            friend.setStatus(1);
+            friendMapper.updateById(friend);
+        } else {
+            // 只有不存在时才插入
+            friend = new Friend();
+            friend.setUserId(userId);
+            friend.setFriendId(friendId);
+            friend.setFriendNickname(friendNickname);
+            friend.setStatus(1);
+            friend.setSequenceId(getNextSequenceId(userId));
+            friendMapper.insert(friend);
         }
     }
 
@@ -224,6 +258,17 @@ public class FriendServiceImpl extends ServiceImpl<FriendMapper, Friend> impleme
             f2.setDeleted(1);
             friendMapper.updateById(f2);
         }
+
+        // 推送通知，触发增量同步
+        java.util.Map<String, Object> delData1 = new java.util.HashMap<>();
+        delData1.put("friendId", friendId);
+        webSocketHandler.sendMessageToUser(userId,
+                new org.linxin.server.websocket.WebSocketMessage("friend_delete", delData1));
+
+        java.util.Map<String, Object> delData2 = new java.util.HashMap<>();
+        delData2.put("friendId", userId);
+        webSocketHandler.sendMessageToUser(friendId,
+                new org.linxin.server.websocket.WebSocketMessage("friend_delete", delData2));
     }
 
     @Override
@@ -232,67 +277,33 @@ public class FriendServiceImpl extends ServiceImpl<FriendMapper, Friend> impleme
                 new LambdaQueryWrapper<Friend>().eq(Friend::getUserId, userId).eq(Friend::getFriendId, friendId)
                         .eq(Friend::getDeleted, 0)) > 0;
     }
-
     @Override
     public List<FriendVO> syncFriends(Long userId, Long lastSequenceId) {
-        // 1. 拉取 sequence_id > lastSequenceId 的所有记录（包括已删除的，以便通知客户端删除本地存储）
-        LambdaQueryWrapper<Friend> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Friend::getUserId, userId).gt(Friend::getSequenceId, lastSequenceId)
-                .orderByAsc(Friend::getSequenceId);
-        List<Friend> friends = friendMapper.selectList(wrapper);
+        // 0. 自愈逻辑：如果前端传来的序列号比后端现有的最大值还要大，说明前端数据不一致（可能是后端重置过）
+        // 此时强制从 0 开始同步
+        Long maxSeq = friendMapper.selectMaxSequenceId(userId);
+        if (maxSeq != null && lastSequenceId > maxSeq) {
+            lastSequenceId = 0L;
+        }
 
-        List<FriendVO> results = friends.stream().map(f -> {
-            FriendVO vo = new FriendVO();
-            vo.setId(f.getId());
-            vo.setUserId(f.getUserId());
-            vo.setFriendId(f.getFriendId());
-            vo.setFriendNickname(f.getFriendNickname());
-            vo.setFriendGroup(f.getFriendGroup());
-            vo.setTags(f.getTags());
-            vo.setCreateTime(f.getCreateTime());
-            vo.setSequenceId(f.getSequenceId());
-            vo.setDeleted(f.getDeleted());
-
-            if (f.getDeleted() == 0) {
-                User user = userMapper.selectById(f.getFriendId());
-                if (user != null) {
-                    vo.setUsername(user.getUsername());
-                    vo.setAvatar(user.getAvatar());
-                    vo.setUserStatus(user.getStatus());
-                    vo.setSignature(user.getSignature());
-                    vo.setUserType(user.getUserType());
-                    vo.setNickname(user.getNickname()); // 设置 nickname 字段
-                    if (vo.getFriendNickname() == null)
-                        vo.setFriendNickname(user.getNickname());
-                }
-            }
-            return vo;
-        }).collect(Collectors.toList());
-
-        // 2. 如果是首次同步，注入 AI 助手
+        // 1. 如果 lastSequenceId 为 0，说明是全量同步或初次同步，强制修复可能缺失的 sequenceId
         if (lastSequenceId == 0) {
-            User aiUser = userMapper.selectOne(new LambdaQueryWrapper<User>().eq(User::getUserType, 1).last("LIMIT 1"));
-            if (aiUser != null) {
-                boolean exists = results.stream().anyMatch(f -> aiUser.getId().equals(f.getFriendId()));
-                if (!exists) {
-                    FriendVO aiVo = new FriendVO();
-                    aiVo.setId(aiUser.getId());
-                    aiVo.setFriendId(aiUser.getId());
-                    aiVo.setFriendNickname("AI 助手");
-                    aiVo.setNickname("AI 助手");
-                    aiVo.setUsername(aiUser.getUsername());
-                    aiVo.setAvatar(aiUser.getAvatar());
-                    aiVo.setUserStatus(aiUser.getStatus());
-                    aiVo.setSignature("我是您的AI智能助手");
-                    aiVo.setUserType(1);
-                    aiVo.setSequenceId(0L);
-                    aiVo.setDeleted(0);
-                    results.add(0, aiVo);
+            // ... (保持现有修复逻辑)
+
+            // 注意：需要包括逻辑删除的记录一起修复，否则它们永远不会被同步给客户端（导致客户端无法得知删除状态）
+            List<Friend> allRecords = friendMapper.selectAllRecordsByUserId(userId);
+
+            for (Friend f : allRecords) {
+                if (f.getSequenceId() == null || f.getSequenceId() == 0) {
+                    f.setSequenceId(getNextSequenceId(userId));
+                    friendMapper.updateById(f);
                 }
             }
         }
 
-        return results;
+        // 1. 拉取 sequence_id > lastSequenceId 的所有记录
+        // 注意：增量同步必须包含 deleted=1 的记录，否则客户端无法同步删除操作
+        return friendMapper.selectSyncRecords(userId, lastSequenceId);
     }
 
     @Override
@@ -311,5 +322,14 @@ public class FriendServiceImpl extends ServiceImpl<FriendMapper, Friend> impleme
                     }
                 });
         return friendMapper.selectList(wrapper);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void addSystemFriend(Long userId, Long systemUserId) {
+        User systemUser = userMapper.selectById(systemUserId);
+        if (systemUser != null) {
+            insertOrRestoreFriend(userId, systemUserId, systemUser.getNickname());
+        }
     }
 }

@@ -4,7 +4,9 @@ import 'package:lin_xin/core/service/http_service.dart';
 import 'package:lin_xin/config/api_config.dart';
 
 class ManualFakeDio implements Dio {
+  @override
   BaseOptions options = BaseOptions();
+  @override
   Interceptors get interceptors => Interceptors();
   
   Response? mockResponse;
@@ -80,7 +82,7 @@ class ManualFakeHttpService implements HttpService {
 
   @override
   Future<Map<String, dynamic>> sendMessage({required String receiverId, required int messageType, required String content, String? extra}) async {
-    final response = await post(ApiConfig.sendMessage, data: {
+    await post(ApiConfig.sendMessage, data: {
       'receiverId': receiverId,
       'messageType': messageType,
       'content': content,

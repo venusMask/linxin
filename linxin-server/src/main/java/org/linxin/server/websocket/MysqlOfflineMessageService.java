@@ -25,16 +25,9 @@ public class MysqlOfflineMessageService implements IOfflineMessageService {
 
     @Override
     public List<Object> fetchAndClearMessages(Long userId) {
-        log.debug("Fetching unread messages for user {} from MySQL", userId);
-        List<org.linxin.server.module.chat.vo.MessageVO> unreadMessages = messageMapper.selectUnreadMessages(userId);
-
-        if (unreadMessages.isEmpty()) {
-            return Collections.emptyList();
-        }
-
-        return unreadMessages.stream().map(vo -> {
-            String type = vo.getGroupId() != null ? "group_message" : "new_message";
-            return new WebSocketMessage(type, vo);
-        }).collect(java.util.stream.Collectors.toList());
+        // 在读扩散和 Sequence ID 同步架构下，用户上线后应通过 /chat/sync 接口主动同步离线期间的消息。
+        // WebSocket 不再主动推送离线期间的历史消息，以减轻上线瞬间的突发流量压力。
+        log.debug("User {} online, waiting for client incremental sync via REST API", userId);
+        return Collections.emptyList();
     }
 }

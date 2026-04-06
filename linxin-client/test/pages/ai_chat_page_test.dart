@@ -79,8 +79,9 @@ class ManualFakeMessageLocalService implements MessageLocalService {
   @override Future<Message?> getMessageById(String id) async => null;
   @override Future<void> deleteMessage(String id) async {}
   @override Future<void> markAsRead(String conversationId) async {}
-  @override Future<int> getUnreadCount(String conversationId) async => 0;
-  @override Future<void> clearConversationMessages(String conversationId) async {}
+  @override Future<void> updateMessageStatus(String id, int status) async {}
+  @override Future<List<Message>> searchMessages(String keyword) async => [];
+  @override Future<void> saveMessages(List<Message> messages) async {}
 }
 
 void main() {

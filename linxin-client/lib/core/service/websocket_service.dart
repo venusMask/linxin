@@ -4,6 +4,7 @@ import 'dart:io';
 import 'dart:math';
 import 'package:meta/meta.dart';
 import 'package:lin_xin/core/service/log_service.dart';
+import 'package:lin_xin/config/api_config.dart';
 
 class WebSocketService {
   WebSocketService._();
@@ -51,8 +52,9 @@ class WebSocketService {
   Future<void> _doConnect() async {
     _heartbeatTimer?.cancel();
     try {
+      final wsUrl = '${ApiConfig.baseUrl.replaceFirst('http', 'ws')}/ws';
       _socket = await WebSocket.connect(
-        'ws://localhost:9099/lxa/ws',
+        wsUrl,
         headers: {
           'Authorization': 'Bearer $_token',
         },

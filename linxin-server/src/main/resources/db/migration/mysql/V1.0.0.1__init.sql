@@ -173,3 +173,18 @@ CREATE TABLE IF NOT EXISTS `email_verification_codes` (
 -- 11. 初始数据
 INSERT INTO `users` (`id`, `username`, `nickname`, `password`, `user_type`, `status`) 
 VALUES (1, 'ai_assistant', 'AI 助手', 'system_protected', 1, 1);
+
+CREATE TABLE IF NOT EXISTS `agent_tokens` (
+      `id` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+      `user_id` BIGINT NOT NULL,
+      `token` VARCHAR(255) NOT NULL,
+      `agent_name` VARCHAR(100) DEFAULT NULL,
+      `scopes` VARCHAR(255) DEFAULT NULL,
+      `status` TINYINT DEFAULT 1,
+      `last_used_time` DATETIME DEFAULT NULL,
+      `expire_time` DATETIME DEFAULT NULL,
+      `create_time` DATETIME DEFAULT CURRENT_TIMESTAMP,
+      `update_time` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY `uk_token` (`token`),
+      INDEX `idx_user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

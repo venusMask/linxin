@@ -10,6 +10,7 @@ import 'package:lin_xin/modules/chat/message_local_service.dart';
 import 'package:lin_xin/core/service/event_bus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:lin_xin/modules/contact/friend_local_service.dart';
+import 'package:lin_xin/config/test_config.dart';
 
 class DataService extends ChangeNotifier {
   static final DataService _instance = DataService._internal();
@@ -55,7 +56,7 @@ class DataService extends ChangeNotifier {
     });
   }
 
-  Future<void> _handleIncomingMessage(dynamic messageData) async {
+  Future<void> _handleIncomingMessage(dynamic messageData, {bool notify = true}) async {
     final messageId = messageData['id']?.toString();
     if (messageId == null) return;
 
@@ -69,7 +70,6 @@ class DataService extends ChangeNotifier {
     final senderId = messageData['senderId']?.toString();
     final senderType = messageData['senderType']?.toString();
     final isAi = messageData['isAi'] as bool? ?? messageData['is_ai'] as bool? ?? false;
-    final senderUserType = messageData['userType'] as int? ?? 0;
     final currentUserId = AuthService().currentUser?.id.toString();
 
     // 如果是 AI 代发的，且发送者是自己，则标记为 isMe
@@ -77,33 +77,29 @@ class DataService extends ChangeNotifier {
 
     var chat = getChatById(conversationId);
     if (chat == null) {
-      // 尝试通过发送者或接收者 ID 创建会话
+      // 尝试通过发送者或接收者 ID 匹配
       final peerId = isMe ? messageData['receiverId']?.toString() : senderId;
       
-      // 如果发送者是系统AI
-      if (senderUserType == 1) {
-        // AI 助手的特殊处理
-        chat = createChat(Friend(
-          id: peerId!,
-          name: messageData['senderNickname']?.toString() ?? 'AI 助手',
-          avatar: messageData['senderAvatar']?.toString() ?? '',
-          userType: 1,
-        ));
-        // 更新会话 ID 为服务器返回的 ID
-        final index = _chats.indexWhere((c) => c.friend?.userType == 1);
-        if (index != -1) {
-          _chats[index] = _chats[index].copyWith(id: conversationId);
+      if (peerId != null) {
+        // 普通好友或 AI 助手（现在也是好友），尝试通过 friendId 找会话
+        chat = getChatByFriendId(peerId);
+        
+        if (chat != null && chat.id.startsWith('chat_')) {
+          // 如果本地会话 ID 是临时的，同步更新为后端真实的 conversationId
+          final index = _chats.indexWhere((c) => c.id == chat!.id);
+          _chats[index] = chat.copyWith(id: conversationId);
           chat = _chats[index];
-        }
-      } else if (peerId != null) {
-        await refreshFriends();
-        final friend = getFriendById(peerId);
-        if (friend != null) {
-          chat = createChat(friend);
-          final index = _chats.indexWhere((c) => c.friend?.id == peerId);
-          if (index != -1) {
-            _chats[index] = _chats[index].copyWith(id: conversationId);
-            chat = _chats[index];
+        } else if (chat == null) {
+          // 会话不存在，尝试刷新好友列表并自动创建
+          await refreshFriends();
+          final friend = getFriendById(peerId);
+          if (friend != null) {
+            chat = createChat(friend, notify: notify);
+            final index = _chats.indexWhere((c) => c.friend?.friendId == peerId);
+            if (index != -1) {
+              _chats[index] = _chats[index].copyWith(id: conversationId);
+              chat = _chats[index];
+            }
           }
         }
       }
@@ -135,6 +131,7 @@ class DataService extends ChangeNotifier {
         conversationId,
         message.content,
         now,
+        notify: notify,
       );
 
       // 通知当前打开的聊天页面
@@ -154,7 +151,7 @@ class DataService extends ChangeNotifier {
     }
   }
 
-  Future<void> _handleIncomingGroupMessage(dynamic messageData) async {
+  Future<void> _handleIncomingGroupMessage(dynamic messageData, {bool notify = true}) async {
     final groupId = messageData['groupId']?.toString();
     final messageId = messageData['id']?.toString();
     if (groupId == null || messageId == null) return;
@@ -174,14 +171,16 @@ class DataService extends ChangeNotifier {
     var chat = getChatById(conversationId);
     if (chat == null) {
       debugPrint('Receive group message but chat is missing: $groupId');
-      // 可以创建临时临时会话
+      // 创建临时会话
       chat = Chat(
         id: conversationId,
+        type: ChatType.group,
         messages: [],
         lastTime: DateTime.now(),
         unreadCount: 0,
       );
       _chats.add(chat);
+      if (notify) notifyListeners();
     }
 
     final senderId = messageData['senderId']?.toString();
@@ -214,6 +213,7 @@ class DataService extends ChangeNotifier {
       conversationId,
       message.content,
       now,
+      notify: notify,
     );
 
     // 通知群聊页面
@@ -257,13 +257,20 @@ class DataService extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       _lastSequenceId = prefs.getInt('last_sequence_id') ?? 0;
       
-      // 加载本地联系人
+      // 加载本地联系人并去重
       final localFriends = await _friendLocalService.getAllFriends();
       _friends.clear();
-      _friends.addAll(localFriends);
+      final Map<String, Friend> uniqueFriends = {};
+      for (var f in localFriends) {
+        uniqueFriends[f.friendId] = f;
+      }
+      _friends.addAll(uniqueFriends.values);
       
       notifyListeners();
       debugPrint('DataService initialized, loaded ${localFriends.length} friends, lastMsgSeqId: $_lastSequenceId');
+      
+      // 启动后立即拉取一次最新好友，不单纯依赖 WebSocket
+      syncFriends();
     } catch (e) {
       debugPrint('Failed to initialize DataService: $e');
     }
@@ -290,16 +297,20 @@ class DataService extends ChangeNotifier {
           maxSeqId = seqId;
         }
 
-        // 区分私聊和群聊
+        // 批量同步时，禁用单条消息的 notify 以提升性能
         final int? conversationType = json['conversationType'] as int?;
         if (conversationType == 1) { // 群聊
-          await _handleIncomingGroupMessage(json);
+          await _handleIncomingGroupMessage(json, notify: false);
         } else {
-          await _handleIncomingMessage(json);
+          await _handleIncomingMessage(json, notify: false);
         }
       }
 
       await _updateLastSequenceId(maxSeqId);
+      
+      // 批量处理完成后，统一通知 UI 刷新
+      notifyListeners();
+      
       debugPrint('Sync ${data.length} messages, new lastSequenceId: $_lastSequenceId');
     } catch (e) {
       debugPrint('Sync messages failed: $e');
@@ -309,16 +320,39 @@ class DataService extends ChangeNotifier {
   // 增量同步好友列表
   Future<void> syncFriends() async {
     try {
+      String? currentUserId = AuthService().currentUser?.id?.toString();
+      
+      // 兜底：如果内存中还没有，尝试从存储中获取
+      if (currentUserId == null) {
+        final prefs = await SharedPreferences.getInstance();
+        currentUserId = prefs.getString('${TestConfig.storagePrefix}auth_user_id');
+      }
+      
+      if (currentUserId == null) {
+        debugPrint('Sync friends skipped: No current user ID available');
+        return;
+      }
+
       final lastSeqId = await _friendLocalService.getMaxSequenceId();
+      debugPrint('Syncing friends for user $currentUserId from sequenceId: $lastSeqId');
+      
       final response = await HttpService().get('/friends/sync', queryParameters: {
         'lastSequenceId': lastSeqId,
       });
 
       final List<dynamic> data = response.data ?? [];
-      if (data.isEmpty) return;
+      if (data.isEmpty) {
+        debugPrint('No new friends to sync');
+        return;
+      }
 
       for (var json in data) {
-        final friend = Friend.fromJson(json);
+        var friend = Friend.fromJson(json);
+        // 强制确保 userId 是当前用户的，防止 Sqlite 归属错误
+        if (friend.userId == null || friend.userId != currentUserId) {
+          friend = friend.copyWith(userId: currentUserId);
+        }
+
         final deleted = json['deleted'] as int? ?? 0;
         
         if (deleted == 1) {
@@ -328,13 +362,19 @@ class DataService extends ChangeNotifier {
         }
       }
 
-      // 同步完成后重新加载内存列表
+      // 同步完成后重新加载内存列表并去重
       final updatedFriends = await _friendLocalService.getAllFriends();
       _friends.clear();
-      _friends.addAll(updatedFriends);
+      
+      // 使用 Map 进行去重，以 friendId 为键
+      final Map<String, Friend> uniqueFriends = {};
+      for (var f in updatedFriends) {
+        uniqueFriends[f.friendId] = f;
+      }
+      _friends.addAll(uniqueFriends.values);
       notifyListeners();
       
-      debugPrint('Sync ${data.length} friends, new max sequenceId: ${await _friendLocalService.getMaxSequenceId()}');
+      debugPrint('Sync ${data.length} friends success, total unique: ${_friends.length}');
     } catch (e) {
       debugPrint('Sync friends failed: $e');
     }
@@ -385,24 +425,25 @@ class DataService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Friend? getFriendById(String id) {
-    try {
-      return _friends.firstWhere((friend) => friend.id == id);
-    } catch (e) {
-      return null;
-    }
-  }
-
   Friend? getAiAssistant() {
+    // 1. 优先从好友列表中找
     try {
       return _friends.firstWhere((f) => f.userType == 1);
     } catch (e) {
-      // 如果好友列表里没同步到，看看会话列表里有没有
+      // 2. 好友列表没同步到，尝试从会话列表里提取
       try {
         return _chats.firstWhere((c) => c.friend?.userType == 1).friend;
       } catch (e) {
         return null;
       }
+    }
+  }
+
+  Friend? getFriendById(String id) {
+    try {
+      return _friends.firstWhere((friend) => friend.id == id);
+    } catch (e) {
+      return null;
     }
   }
 
@@ -417,13 +458,13 @@ class DataService extends ChangeNotifier {
   Chat? getChatByFriendId(String friendId) {
     try {
       return _chats.firstWhere(
-          (chat) => chat.friend != null && chat.friend!.id == friendId);
+          (chat) => chat.friend != null && chat.friend!.friendId == friendId);
     } catch (e) {
       return null;
     }
   }
 
-  Chat createChat(Friend friend) {
+  Chat createChat(Friend friend, {bool notify = true}) {
     final existingChat = getChatByFriendId(friend.id);
     if (existingChat != null) {
       return existingChat;
@@ -437,11 +478,11 @@ class DataService extends ChangeNotifier {
       unreadCount: 0,
     );
     _chats.add(newChat);
-    notifyListeners();
+    if (notify) notifyListeners();
     return newChat;
   }
 
-  void addMessage(String chatId, String content, DateTime time) {
+  void addMessage(String chatId, String content, DateTime time, {bool notify = true}) {
     final chat = getChatById(chatId);
     if (chat != null) {
       final index = _chats.indexWhere((c) => c.id == chatId);
@@ -457,7 +498,7 @@ class DataService extends ChangeNotifier {
         _chats.insert(0, updatedChat);
       }
       
-      notifyListeners();
+      if (notify) notifyListeners();
     }
   }
 

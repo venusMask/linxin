@@ -4,7 +4,6 @@ import 'package:lin_xin/config/api_config.dart';
 import 'package:lin_xin/modules/auth/user.dart';
 import 'package:lin_xin/core/service/http_service.dart';
 import 'package:lin_xin/core/service/websocket_service.dart';
-import 'package:lin_xin/core/service/db_service.dart';
 import 'package:lin_xin/config/test_config.dart';
 
 class AuthService extends ChangeNotifier {
@@ -41,6 +40,7 @@ class AuthService extends ChangeNotifier {
       _httpService.setToken(token);
       try {
         final response = await _httpService.get(ApiConfig.userInfo);
+        // HttpService 已拆包，直接使用 response.data
         _currentUser = User.fromJson(response.data);
       } catch (e) {
         // 如果请求失败，可能是 Token 已失效，清除本地数据
@@ -72,6 +72,7 @@ class AuthService extends ChangeNotifier {
         'verificationCode': verificationCode,
       },
     );
+    // 从 response.data 中提取数据 (HttpService已拆包)
     return User.fromJson(response.data);
   }
 
@@ -97,11 +98,11 @@ class AuthService extends ChangeNotifier {
     await _httpService.put(
       ApiConfig.updateProfile,
       data: {
-        'nickname': ?nickname,
-        'username': ?username,
-        'avatar': ?avatar,
-        'signature': ?signature,
-        'gender': ?gender,
+        'nickname': nickname,
+        'username': username,
+        'avatar': avatar,
+        'signature': signature,
+        'gender': gender,
       },
     );
 
@@ -166,16 +167,21 @@ class AuthService extends ChangeNotifier {
       },
     );
 
-    final Map<String, dynamic> data = response.data;
-    final String token = data['token'];
+    // 关键点：HttpService 已经在拦截器中执行了 response.data = respData['data']
+    // 所以这里的 response.data 直接就是用户信息 Map
+    final Map<String, dynamic> userData = response.data;
+    
+    final String token = userData['token'];
+    // 后端返回的是 userId，映射为 User 模型中的 id
+    final dynamic userId = userData['userId'];
 
     _httpService.setToken(token);
-    await _persistAuthData(token, data['userId'], data['username'], data['nickname']);
+    await _persistAuthData(token, userId, userData['username'], userData['nickname']);
 
     _currentUser = User(
-      id: data['userId'],
-      username: data['username'],
-      nickname: data['nickname'],
+      id: userId,
+      username: userData['username'],
+      nickname: userData['nickname'],
     );
 
     WebSocketService().setToken(token);
@@ -185,7 +191,7 @@ class AuthService extends ChangeNotifier {
     return _currentUser;
   }
 
-  Future<void> _persistAuthData(String token, int userId, String username, String nickname) async {
+  Future<void> _persistAuthData(String token, dynamic userId, String username, String nickname) async {
     final prefs = await SharedPreferences.getInstance();
     final prefix = TestConfig.storagePrefix;
     await prefs.setString('${prefix}auth_token', token);
@@ -208,9 +214,10 @@ class AuthService extends ChangeNotifier {
     _httpService.clearToken();
     WebSocketService().disconnect();
     await _clearAuthData();
-    if (!TestConfig.isWeb) {
-      await DatabaseService().clearUserData();
-    }
+    // 移除 clearUserData() 以防止每次退出导致消息数据丢失
+    // if (!TestConfig.isWeb) {
+    //   await DatabaseService().clearUserData();
+    // }
     notifyListeners();
   }
 

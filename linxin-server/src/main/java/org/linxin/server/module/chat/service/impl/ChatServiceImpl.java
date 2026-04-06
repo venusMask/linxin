@@ -48,7 +48,6 @@ public class ChatServiceImpl implements IChatService {
     private final WebSocketHandler webSocketHandler;
     private final GroupMapper groupMapper;
     private final GroupMemberMapper groupMemberMapper;
-    private final org.linxin.server.module.chat.mapper.MessageStatusMapper messageStatusMapper;
     private final AIService aiService;
     private final IAgentService agentService;
     private final org.linxin.server.module.chat.service.IMessageService messageService;
@@ -63,7 +62,6 @@ public class ChatServiceImpl implements IChatService {
             @Lazy WebSocketHandler webSocketHandler,
             GroupMapper groupMapper,
             GroupMemberMapper groupMemberMapper,
-            org.linxin.server.module.chat.mapper.MessageStatusMapper messageStatusMapper,
             AIService aiService,
             IAgentService agentService,
             org.linxin.server.module.chat.service.IMessageService messageService,
@@ -76,7 +74,6 @@ public class ChatServiceImpl implements IChatService {
         this.webSocketHandler = webSocketHandler;
         this.groupMapper = groupMapper;
         this.groupMemberMapper = groupMemberMapper;
-        this.messageStatusMapper = messageStatusMapper;
         this.aiService = aiService;
         this.agentService = agentService;
         this.messageService = messageService;
@@ -209,7 +206,7 @@ public class ChatServiceImpl implements IChatService {
 
         updateSenderConversation(senderConversation, message, senderId);
         updateReceiverConversation(receiverConversation, receiverMessage, senderId);
-        saveMessageStatus(receiverMessage.getId(), request.getReceiverId());
+        // 移除已失效的消息状态保存逻辑
 
         // 推送给接收方
         MessageVO messageVO = chatConverter.toVO(receiverMessage);
@@ -398,9 +395,11 @@ public class ChatServiceImpl implements IChatService {
     @Override
     public IPage<MessageVO> getMessagesBetweenUsers(Long userId, Long peerId, Integer pageNum, Integer pageSize) {
         Page<Message> pageParam = new Page<>(pageNum, pageSize, 100);
+
+        Conversation conversation = getOrCreateConversation(userId, peerId);
+
         LambdaQueryWrapper<Message> wrapper = new LambdaQueryWrapper<>();
-        wrapper.and(w -> w.eq(Message::getSenderId, userId).eq(Message::getReceiverId, peerId)
-                .or().eq(Message::getSenderId, peerId).eq(Message::getReceiverId, userId))
+        wrapper.eq(Message::getConversationId, conversation.getId())
                 .eq(Message::getDeleted, 0).orderByDesc(Message::getSendTime);
         Page<Message> messagePage = messageMapper.selectPage(pageParam, wrapper);
         return messagePage.convert(message -> {
@@ -503,78 +502,73 @@ public class ChatServiceImpl implements IChatService {
         conversationMapper.update(null, updateWrapper);
     }
 
-    private void saveMessageStatus(Long messageId, Long userId) {
-        org.linxin.server.module.chat.entity.MessageStatus status = new org.linxin.server.module.chat.entity.MessageStatus();
-        status.setMessageId(messageId);
-        status.setUserId(userId);
-        status.setReadStatus(0);
-        status.setCreateTime(LocalDateTime.now());
-        messageStatusMapper.insert(status);
-    }
-
     @Override
     @Transactional(rollbackFor = Exception.class)
     public Message sendGroupMessage(Long senderId, SendMessageRequest request) {
         Long groupId = request.getGroupId();
         Group group = groupMapper.selectById(groupId);
-        if (group == null || group.getDeleted() == 1)
-            throw new RuntimeException("群组不存在");
+        if (group == null || group.getDeleted() == 1) {
+            throw new org.linxin.server.common.exception.BusinessException("群组不存在");
+        }
+
         List<GroupMember> members = groupMemberMapper.selectList(new LambdaQueryWrapper<GroupMember>()
                 .eq(GroupMember::getGroupId, groupId).eq(GroupMember::getDeleted, 0));
         LocalDateTime sendTime = LocalDateTime.now();
 
-        // N+1 优化：发送者信息提到循环外，避免每次迭代重复查询
+        // 1. 读扩散优化：仅插入一条消息记录
+        Message groupMsg = new Message();
+        groupMsg.setConversationId(0L); // 群聊消息在读扩散模式下，conversationId 设为 0
+        groupMsg.setSenderId(senderId);
+        groupMsg.setReceiverId(0L);
+        groupMsg.setGroupId(groupId);
+        groupMsg.setMessageType(request.getMessageType());
+        groupMsg.setContent(request.getContent());
+        groupMsg.setSendStatus(SendStatus.SENT);
+        groupMsg.setSendTime(sendTime);
+        groupMsg.setIsAi(false);
+        groupMsg.setSequenceId(messageService.getNextSequenceId());
+        messageMapper.insert(groupMsg);
+
+        // 2. 批量更新所有群成员的会话状态 (排除发送者，发送者的会话由专门方法更新)
+        // 注意：在 MySQL-Only 环境下，这是降低 I/O 压力的关键
+        com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<Conversation> updateWrapper = new com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<>();
+        updateWrapper.eq(Conversation::getGroupId, groupId)
+                .eq(Conversation::getType, 1) // 群聊类型
+                .set(Conversation::getLastMessageId, groupMsg.getId())
+                .set(Conversation::getLastMessageContent, truncateContent(groupMsg.getContent(), 50))
+                .set(Conversation::getLastMessageType, groupMsg.getMessageType())
+                .set(Conversation::getLastMessageTime, groupMsg.getSendTime())
+                .setSql("unread_count = unread_count + 1");
+
+        // 更新接收者们（不包括发送者，发送者不需要加未读数）
+        updateWrapper.ne(Conversation::getUserId, senderId);
+        conversationMapper.update(null, updateWrapper);
+
+        // 更新发送者的会话（不加未读数）
+        Conversation senderConv = getOrCreateGroupConversation(senderId, groupId, group.getName());
+        updateSenderConversation(senderConv, groupMsg, senderId);
+
+        // 3. 异步推送给所有在线成员
         User sender = userMapper.selectById(senderId);
-
-        // 批量预查询所有群成员的 Conversation，减少 DB 调用
-        List<Long> memberIds = members.stream().map(GroupMember::getUserId).collect(Collectors.toList());
-        List<Conversation> existingConversations = memberIds.isEmpty()
-                ? new ArrayList<>()
-                : conversationMapper.selectList(new LambdaQueryWrapper<Conversation>()
-                        .in(Conversation::getUserId, memberIds)
-                        .eq(Conversation::getGroupId, groupId)
-                        .eq(Conversation::getType, 1));
-        Map<Long, Conversation> convByUserId = existingConversations.stream()
-                .collect(Collectors.toMap(Conversation::getUserId, c -> c, (a, b) -> a));
-
-        Message senderMsg = null;
-        for (GroupMember member : members) {
-            // 使用预查询结果，找不到时才单次创建
-            Conversation conversation = convByUserId.computeIfAbsent(
-                    member.getUserId(),
-                    uid -> getOrCreateGroupConversation(uid, groupId, group.getName()));
-
-            Message message = new Message();
-            message.setConversationId(conversation.getId());
-            message.setSenderId(senderId);
-            message.setReceiverId(0L);
-            message.setGroupId(groupId);
-            message.setMessageType(request.getMessageType());
-            message.setContent(request.getContent());
-            message.setSendStatus(SendStatus.SENT);
-            message.setSendTime(sendTime);
-            message.setIsAi(false);
-            message.setSequenceId(messageService.getNextSequenceId());
-            messageMapper.insert(message);
-            if (member.getUserId().equals(senderId)) {
-                senderMsg = message;
-                updateSenderConversation(conversation, message, senderId);
-            } else {
-                updateReceiverConversation(conversation, message, senderId);
-                saveMessageStatus(message.getId(), member.getUserId());
-                MessageVO messageVO = chatConverter.toVO(message);
-                // 使用循环外缓存的发送者信息
-                if (sender != null) {
-                    messageVO.setSenderNickname(sender.getNickname());
-                    messageVO.setSenderAvatar(sender.getAvatar());
-                }
-                messageVO.setGroupId(groupId);
-                messageVO.setConversationType(1);
-                webSocketHandler.sendMessageToUser(member.getUserId(),
-                        new WebSocketMessage("group_message", messageVO));
-            }
+        MessageVO messageVO = chatConverter.toVO(groupMsg);
+        if (sender != null) {
+            messageVO.setSenderNickname(sender.getNickname());
+            messageVO.setSenderAvatar(sender.getAvatar());
         }
-        return senderMsg;
+        messageVO.setGroupId(groupId);
+        messageVO.setConversationType(1);
+
+        // 使用 taskExecutor 异步推送，减少对事务耗时的影响
+        taskExecutor.execute(() -> {
+            for (GroupMember member : members) {
+                if (!member.getUserId().equals(senderId)) {
+                    webSocketHandler.sendMessageToUser(member.getUserId(),
+                            new WebSocketMessage("group_message", messageVO));
+                }
+            }
+        });
+
+        return groupMsg;
     }
 
     private Conversation getOrCreateGroupConversation(Long userId, Long groupId, String groupName) {
@@ -605,17 +599,36 @@ public class ChatServiceImpl implements IChatService {
 
     @Override
     public List<MessageVO> syncMessages(Long userId, Long lastSequenceId) {
+        // 自愈逻辑：如果前端传来的序列号比后端现有的最大值还要大，说明前端数据不一致（可能是后端重置过）
+        Long maxSeq = messageMapper.selectMaxSequenceId(userId);
+        if (maxSeq != null && lastSequenceId > maxSeq) {
+            lastSequenceId = 0L;
+        }
+
+        List<Long> conversationIds = conversationMapper.selectList(
+                new LambdaQueryWrapper<Conversation>().eq(Conversation::getUserId, userId)).stream()
+                .map(Conversation::getId).collect(Collectors.toList());
+
         List<Long> groupIds = groupMemberMapper
                 .selectList(new LambdaQueryWrapper<GroupMember>().eq(GroupMember::getUserId, userId)
                         .eq(GroupMember::getDeleted, 0))
                 .stream().map(GroupMember::getGroupId).collect(Collectors.toList());
+
         LambdaQueryWrapper<Message> wrapper = new LambdaQueryWrapper<>();
         wrapper.gt(Message::getSequenceId, lastSequenceId)
                 .and(w -> {
-                    w.eq(Message::getSenderId, userId).or().eq(Message::getReceiverId, userId);
-                    if (!groupIds.isEmpty())
+                    if (!conversationIds.isEmpty()) {
+                        w.in(Message::getConversationId, conversationIds);
+                    } else {
+                        w.eq(Message::getConversationId, -1L);
+                    }
+                    if (!groupIds.isEmpty()) {
                         w.or().in(Message::getGroupId, groupIds);
-                }).orderByAsc(Message::getSequenceId);
+                    }
+                })
+                .orderByAsc(Message::getSequenceId)
+                .last("LIMIT 500"); // 增加单次同步限制，防止 OOM
+
         List<Message> messages = messageMapper.selectList(wrapper);
 
         if (messages.isEmpty()) {
@@ -644,6 +657,7 @@ public class ChatServiceImpl implements IChatService {
             return vo;
         }).collect(Collectors.toList());
     }
+
     @Override
     public boolean isConversationOwner(Long userId, Long conversationId) {
         if (userId == null || conversationId == null) {
