@@ -121,7 +121,7 @@ class DataService extends ChangeNotifier {
         isMe: isMe,
         senderType: senderType,
         isAi: isAi,
-        sequenceId: messageData['sequenceId'] as int?,
+        sequenceId: int.tryParse(messageData['sequenceId']?.toString() ?? ''),
       );
       
       await _messageLocalService.saveMessage(message);
@@ -144,7 +144,7 @@ class DataService extends ChangeNotifier {
       ));
 
       // 更新 sequenceId
-      final int? seqId = messageData['sequenceId'] as int?;
+      final int? seqId = int.tryParse(messageData['sequenceId']?.toString() ?? '');
       if (seqId != null) {
         await _updateLastSequenceId(seqId);
       }
@@ -160,7 +160,7 @@ class DataService extends ChangeNotifier {
     final existingMessage = await _messageLocalService.getMessageById(messageId);
     if (existingMessage != null) {
       // 如果已存在，仍尝试更新 sequenceId 以防同步遗漏
-      final int? seqId = messageData['sequenceId'] as int?;
+      final int? seqId = int.tryParse(messageData['sequenceId']?.toString() ?? '');
       if (seqId != null) {
         await _updateLastSequenceId(seqId);
       }
@@ -199,7 +199,7 @@ class DataService extends ChangeNotifier {
       createdAt: now,
       isRead: false,
       isMe: isMe,
-      sequenceId: messageData['sequenceId'] as int?,
+      sequenceId: int.tryParse(messageData['sequenceId']?.toString() ?? ''),
       senderType: messageData['senderType']?.toString(),
       isAi: messageData['isAi'] as bool? ?? messageData['is_ai'] as bool? ?? false,
       senderNickname: messageData['senderNickname']?.toString() ?? '用户',
@@ -226,7 +226,7 @@ class DataService extends ChangeNotifier {
     ));
 
     // 更新 sequenceId
-    final int? seqId = messageData['sequenceId'] as int?;
+    final int? seqId = int.tryParse(messageData['sequenceId']?.toString() ?? '');
     if (seqId != null) {
       await _updateLastSequenceId(seqId);
     }
@@ -292,7 +292,7 @@ class DataService extends ChangeNotifier {
 
       int maxSeqId = _lastSequenceId;
       for (var json in data) {
-        final int? seqId = json['sequenceId'] as int?;
+        final int? seqId = int.tryParse(json['sequenceId']?.toString() ?? '');
         if (seqId != null && seqId > maxSeqId) {
           maxSeqId = seqId;
         }
