@@ -62,6 +62,7 @@ class WebSocketService {
       
       _socket?.listen(
         (data) {
+          LogService.info('[Trace] WebSocket data received: $data');
           try {
             var jsonData = jsonDecode(data);
             final type = jsonData['type'] as String?;

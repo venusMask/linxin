@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:lin_xin/modules/chat/chat.dart';
 import 'package:lin_xin/modules/contact/friend.dart';
@@ -26,14 +27,19 @@ class DataService extends ChangeNotifier {
   late final MessageLocalService _messageLocalService;
   late final FriendLocalService _friendLocalService;
 
+  StreamSubscription? _connectSub;
+  StreamSubscription? _friendSub;
+  StreamSubscription? _msgSub;
+  StreamSubscription? _groupMsgSub;
+
   void _initWebSocketListener() {
     // 监听 WebSocket 连接成功事件，自动触发增量同步
-    WebSocketService.instance.connectStream.listen((_) {
+    _connectSub = WebSocketService.instance.connectStream.listen((_) {
       syncMessages();
       syncFriends();
     });
 
-    WebSocketService.instance.friendEventStream.listen((event) {
+    _friendSub = WebSocketService.instance.friendEventStream.listen((event) {
       final type = event['type'];
       if (type == 'friend_apply') {
         refreshPendingApplyCount();
@@ -43,29 +49,54 @@ class DataService extends ChangeNotifier {
       }
     });
 
-    WebSocketService.instance.messageStream.listen((event) {
-      if (event['type'] == 'new_message') {
-        _handleIncomingMessage(event['data']);
+    _msgSub = WebSocketService.instance.messageStream.listen((event) {
+      debugPrint('[Trace] DataService received message event: $event');
+      try {
+        if (event['type'] == 'new_message') {
+          _handleIncomingMessage(event['data']);
+        }
+      } catch (e, stack) {
+        debugPrint('[Trace] Error in DataService message listener: $e\n$stack');
       }
     });
 
-    WebSocketService.instance.groupMessageStream.listen((event) {
+    _groupMsgSub = WebSocketService.instance.groupMessageStream.listen((event) {
       if (event['type'] == 'group_message') {
         _handleIncomingGroupMessage(event['data']);
       }
     });
   }
 
-  Future<void> _handleIncomingMessage(dynamic messageData, {bool notify = true}) async {
+  @override
+  void dispose() {
+    _connectSub?.cancel();
+    _friendSub?.cancel();
+    _msgSub?.cancel();
+    _groupMsgSub?.cancel();
+    super.dispose();
+  }
+
+  Future<bool> _handleIncomingMessage(dynamic messageData, {bool notify = true}) async {
     final messageId = messageData['id']?.toString();
-    if (messageId == null) return;
+    debugPrint('[Trace] _handleIncomingMessage starting for id: $messageId');
+    if (messageId == null) {
+      debugPrint('[Trace] messageId is null, dropping');
+      return false;
+    }
 
     // 幂等处理：检查消息是否已经存在
     final existingMessage = await _messageLocalService.getMessageById(messageId);
-    if (existingMessage != null) return;
+    if (existingMessage != null) {
+      debugPrint('[Trace] message already exists (idempotency), skipping');
+      return true;
+    }
 
     final conversationId = messageData['conversationId']?.toString();
-    if (conversationId == null) return;
+    debugPrint('[Trace] conversationId: $conversationId');
+    if (conversationId == null) {
+      debugPrint('[Trace] conversationId is null, dropping');
+      return false;
+    }
 
     final senderId = messageData['senderId']?.toString();
     final senderType = messageData['senderType']?.toString();
@@ -75,10 +106,11 @@ class DataService extends ChangeNotifier {
     // 如果是 AI 代发的，且发送者是自己，则标记为 isMe
     bool isMe = (senderId == currentUserId);
 
+    final peerId = isMe ? messageData['receiverId']?.toString() : senderId;
     var chat = getChatById(conversationId);
     if (chat == null) {
       // 尝试通过发送者或接收者 ID 匹配
-      final peerId = isMe ? messageData['receiverId']?.toString() : senderId;
+      debugPrint('[Trace] senderId: $senderId, peerId: $peerId, isMe: $isMe');
       
       if (peerId != null) {
         // 普通好友或 AI 助手（现在也是好友），尝试通过 friendId 找会话
@@ -92,7 +124,7 @@ class DataService extends ChangeNotifier {
         } else if (chat == null) {
           // 会话不存在，尝试刷新好友列表并自动创建
           await refreshFriends();
-          final friend = getFriendById(peerId);
+          final friend = getFriendByUserId(peerId);
           if (friend != null) {
             chat = createChat(friend, notify: notify);
             final index = _chats.indexWhere((c) => c.friend?.friendId == peerId);
@@ -146,15 +178,19 @@ class DataService extends ChangeNotifier {
       // 更新 sequenceId
       final int? seqId = int.tryParse(messageData['sequenceId']?.toString() ?? '');
       if (seqId != null) {
-        await _updateLastSequenceId(seqId);
+        await updateLastSequenceId(seqId);
       }
+      debugPrint('[Trace] Message processed successfully, ID: $messageId');
+      return true;
     }
+    debugPrint('[Trace] Chat not found for peerId: $peerId and conversationId: $conversationId, dropping message');
+    return false;
   }
 
-  Future<void> _handleIncomingGroupMessage(dynamic messageData, {bool notify = true}) async {
+  Future<bool> _handleIncomingGroupMessage(dynamic messageData, {bool notify = true}) async {
     final groupId = messageData['groupId']?.toString();
     final messageId = messageData['id']?.toString();
-    if (groupId == null || messageId == null) return;
+    if (groupId == null || messageId == null) return false;
 
     // 幂等处理
     final existingMessage = await _messageLocalService.getMessageById(messageId);
@@ -162,9 +198,9 @@ class DataService extends ChangeNotifier {
       // 如果已存在，仍尝试更新 sequenceId 以防同步遗漏
       final int? seqId = int.tryParse(messageData['sequenceId']?.toString() ?? '');
       if (seqId != null) {
-        await _updateLastSequenceId(seqId);
+        await updateLastSequenceId(seqId);
       }
-      return;
+      return true;
     }
 
     final conversationId = messageData['conversationId']?.toString() ?? 'group_$groupId';
@@ -228,8 +264,9 @@ class DataService extends ChangeNotifier {
     // 更新 sequenceId
     final int? seqId = int.tryParse(messageData['sequenceId']?.toString() ?? '');
     if (seqId != null) {
-      await _updateLastSequenceId(seqId);
+      await updateLastSequenceId(seqId);
     }
+    return true;
   }
 
   final List<Friend> _friends = [];
@@ -242,12 +279,13 @@ class DataService extends ChangeNotifier {
   int get pendingApplyCount => _pendingApplyCount;
 
   // 更新并持久化 lastSequenceId
-  Future<void> _updateLastSequenceId(int newId) async {
+  Future<void> updateLastSequenceId(int newId) async {
     if (newId > _lastSequenceId) {
       _lastSequenceId = newId;
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt('last_sequence_id', _lastSequenceId);
-      debugPrint('Updated lastSequenceId to: $_lastSequenceId');
+      final userId = AuthService().currentUser?.id?.toString() ?? 'default';
+      await prefs.setInt('${TestConfig.storagePrefix}last_seq_$userId', _lastSequenceId);
+      debugPrint('Updated lastSequenceId to: $_lastSequenceId for user $userId');
     }
   }
 
@@ -255,8 +293,9 @@ class DataService extends ChangeNotifier {
   Future<void> initialize() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      _lastSequenceId = prefs.getInt('last_sequence_id') ?? 0;
-      
+      final userId = AuthService().currentUser?.id?.toString() ?? 'default';
+      _lastSequenceId = prefs.getInt('${TestConfig.storagePrefix}last_seq_$userId') ?? 0;
+
       // 加载本地联系人并去重
       final localFriends = await _friendLocalService.getAllFriends();
       _friends.clear();
@@ -290,23 +329,27 @@ class DataService extends ChangeNotifier {
         return;
       }
 
-      int maxSeqId = _lastSequenceId;
+      int maxSuccessSeqId = _lastSequenceId;
       for (var json in data) {
-        final int? seqId = int.tryParse(json['sequenceId']?.toString() ?? '');
-        if (seqId != null && seqId > maxSeqId) {
-          maxSeqId = seqId;
+        final int? conversationType = json['conversationType'] as int?;
+        bool success;
+        
+        // 批量同步时，禁用单条消息的 notify 以提升性能
+        if (conversationType == 1) { // 群聊
+          success = await _handleIncomingGroupMessage(json, notify: false);
+        } else {
+          success = await _handleIncomingMessage(json, notify: false);
         }
 
-        // 批量同步时，禁用单条消息的 notify 以提升性能
-        final int? conversationType = json['conversationType'] as int?;
-        if (conversationType == 1) { // 群聊
-          await _handleIncomingGroupMessage(json, notify: false);
-        } else {
-          await _handleIncomingMessage(json, notify: false);
+        if (success) {
+          final int? seqId = int.tryParse(json['sequenceId']?.toString() ?? '');
+          if (seqId != null && seqId > maxSuccessSeqId) {
+            maxSuccessSeqId = seqId;
+          }
         }
       }
 
-      await _updateLastSequenceId(maxSeqId);
+      await updateLastSequenceId(maxSuccessSeqId);
       
       // 批量处理完成后，统一通知 UI 刷新
       notifyListeners();
@@ -436,6 +479,14 @@ class DataService extends ChangeNotifier {
       } catch (e) {
         return null;
       }
+    }
+  }
+
+  Friend? getFriendByUserId(String friendId) {
+    try {
+      return _friends.firstWhere((friend) => friend.friendId == friendId);
+    } catch (e) {
+      return null;
     }
   }
 

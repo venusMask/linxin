@@ -1,5 +1,6 @@
 package org.linxin.server.common.util;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
@@ -27,7 +28,8 @@ public class SnowflakeIdWorker {
     private final long sequenceMask = -1L ^ (-1L << sequenceBits);
 
     // 工作机器 ID (0~1023)
-    private long workerId = 1L;
+    @Value("${snowflake.worker-id:1}")
+    private long workerId;
 
     // 毫秒内序列 (0~4095)
     private long sequence = 0L;

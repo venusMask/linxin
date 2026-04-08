@@ -18,7 +18,7 @@ public class JacksonConfig {
         ObjectMapper mapper = new ObjectMapper();
         mapper.registerModule(new JavaTimeModule());
 
-        // 解决前端 JS 无法精确处理 Long 的问题 (2^53-1 限制)
+        // 将 Long 类型 ID 序列化为字符串，统一 API 中 ID 的类型为 String (提升跨端兼容性)
         SimpleModule simpleModule = new SimpleModule();
         simpleModule.addSerializer(Long.class, ToStringSerializer.instance);
         simpleModule.addSerializer(Long.TYPE, ToStringSerializer.instance);

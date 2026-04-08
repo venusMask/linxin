@@ -2,7 +2,6 @@ package org.linxin.server.websocket;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
-import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.locks.ReentrantLock;
 import lombok.extern.slf4j.Slf4j;
@@ -12,6 +11,11 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
+/**
+ * WebSocket 消息处理类
+ * 
+ * 简化架构：由于单机 MySQL 环境，移除了 IMessageBroker 和 IOfflineMessageService 冗余抽象。
+ */
 @Slf4j
 @Component
 public class WebSocketHandler extends TextWebSocketHandler {
@@ -20,14 +24,9 @@ public class WebSocketHandler extends TextWebSocketHandler {
     private static final ConcurrentHashMap<Long, ReentrantLock> sessionLocks = new ConcurrentHashMap<>();
 
     private final ObjectMapper objectMapper;
-    private final IMessageBroker messageBroker;
-    private final IOfflineMessageService offlineMessageService;
 
-    public WebSocketHandler(ObjectMapper objectMapper, IMessageBroker messageBroker,
-            IOfflineMessageService offlineMessageService) {
+    public WebSocketHandler(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
-        this.messageBroker = messageBroker;
-        this.offlineMessageService = offlineMessageService;
     }
 
     @Override
@@ -36,14 +35,9 @@ public class WebSocketHandler extends TextWebSocketHandler {
         if (userId != null) {
             sessions.put(userId, session);
             sessionLocks.put(userId, new ReentrantLock());
-
             log.info("WebSocket connected: user {}", userId);
 
-            // 离线消息拉取逻辑抽象
-            List<Object> pendingMessages = offlineMessageService.fetchAndClearMessages(userId);
-            for (Object msg : pendingMessages) {
-                pushMessageToLocalUser(userId, msg);
-            }
+            // 离线消息拉取由客户端重连后主动调用 /chat/sync 实现，无需后端推送历史消息
         }
     }
 
@@ -58,11 +52,18 @@ public class WebSocketHandler extends TextWebSocketHandler {
     }
 
     /**
-     * 业务调用入口
+     * 业务调用入口：向指定用户推送消息
      */
     public void sendMessageToUser(Long userId, Object message) {
-        // 委托给经纪人处理跨机/本地分发
-        messageBroker.broadcastToUser(userId, message);
+        log.info("[Trace] Attempting to push message to user {}", userId);
+        boolean success = pushMessageToLocalUser(userId, message);
+        if (!success) {
+            log.info(
+                    "[Trace] User {} is offline or session closed, message will be retrieved via /chat/sync on next login",
+                    userId);
+        } else {
+            log.info("[Trace] Message pushed to user {} successfully", userId);
+        }
     }
 
     /**
@@ -70,20 +71,30 @@ public class WebSocketHandler extends TextWebSocketHandler {
      */
     public boolean pushMessageToLocalUser(Long userId, Object message) {
         WebSocketSession session = sessions.get(userId);
-        if (session != null && session.isOpen()) {
-            ReentrantLock lock = sessionLocks.computeIfAbsent(userId, k -> new ReentrantLock());
-            lock.lock();
-            try {
-                if (session.isOpen()) {
-                    String json = objectMapper.writeValueAsString(message);
-                    session.sendMessage(new TextMessage(json));
-                    return true;
-                }
-            } catch (IOException e) {
-                log.error("Failed to push message to user {}", userId, e);
-            } finally {
-                lock.unlock();
+        if (session == null) {
+            log.info("[Trace] No session found for user {}", userId);
+            return false;
+        }
+
+        if (!session.isOpen()) {
+            log.info("[Trace] Session for user {} exists but is CLOSED", userId);
+            return false;
+        }
+
+        ReentrantLock lock = sessionLocks.computeIfAbsent(userId, k -> new ReentrantLock());
+        lock.lock();
+        try {
+            if (session.isOpen()) {
+                String json = objectMapper.writeValueAsString(message);
+                session.sendMessage(new TextMessage(json));
+                return true;
+            } else {
+                log.info("[Trace] Session for user {} closed just before sending", userId);
             }
+        } catch (IOException e) {
+            log.error("[Trace] IOException pushing message to user {}: {}", userId, e.getMessage());
+        } finally {
+            lock.unlock();
         }
         return false;
     }

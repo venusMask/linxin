@@ -4,6 +4,7 @@ import 'package:lin_xin/core/service/http_service.dart';
 import 'package:lin_xin/core/service/db_service.dart';
 import 'package:lin_xin/modules/chat/message_local_service.dart';
 import 'package:lin_xin/core/service/event_bus.dart';
+import 'package:lin_xin/core/state/data_service.dart';
 
 class MessageService {
   MessageService._();
@@ -30,6 +31,8 @@ class MessageService {
       extra: extra,
     );
 
+    final int? sequenceId = int.tryParse(response['sequenceId']?.toString() ?? '');
+
     final message = Message(
       id: response['id']?.toString() ?? '',
       conversationId: conversationId,
@@ -39,9 +42,14 @@ class MessageService {
       status: 1,
       createdAt: DateTime.now(),
       isRead: false,
+      sequenceId: sequenceId,
     );
 
     await _localService.saveMessage(message);
+
+    if (sequenceId != null) {
+      DataService().updateLastSequenceId(sequenceId);
+    }
 
     _eventBus.emit(MessageSentEvent(
       conversationId: conversationId,

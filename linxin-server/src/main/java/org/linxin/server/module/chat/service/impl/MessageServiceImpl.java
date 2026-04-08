@@ -6,49 +6,39 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.linxin.server.common.constant.SendStatus;
+import org.linxin.server.module.chat.converter.ChatConverter;
+import org.linxin.server.module.chat.entity.Conversation;
 import org.linxin.server.module.chat.entity.Message;
+import org.linxin.server.module.chat.mapper.ConversationMapper;
 import org.linxin.server.module.chat.mapper.MessageMapper;
-import org.linxin.server.module.chat.model.request.SendMessageRequest;
 import org.linxin.server.module.chat.service.IMessageService;
+import org.linxin.server.module.chat.vo.MessageVO;
+import org.linxin.server.module.user.entity.User;
+import org.linxin.server.module.user.mapper.UserMapper;
 import org.linxin.server.websocket.WebSocketHandler;
 import org.linxin.server.websocket.WebSocketMessage;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * 消息服务实现类
+ * 
+ * 核心职能：sequenceId 生成及代发消息。
+ */
 @Service
 @RequiredArgsConstructor
 public class MessageServiceImpl extends ServiceImpl<MessageMapper, Message> implements IMessageService {
 
-    private final WebSocketHandler webSocketHandler;
-    private final org.linxin.server.module.user.mapper.UserMapper userMapper;
-    private final org.linxin.server.module.chat.mapper.ConversationMapper conversationMapper;
-    private final org.linxin.server.module.chat.converter.ChatConverter chatConverter;
     private final org.linxin.server.common.util.SnowflakeIdWorker snowflakeIdWorker;
+    private final WebSocketHandler webSocketHandler;
+    private final UserMapper userMapper;
+    private final ConversationMapper conversationMapper;
+    private final ChatConverter chatConverter;
 
     @Override
     public Long getNextSequenceId() {
         return snowflakeIdWorker.nextId();
-    }
-
-    @Override
-    public Message sendMessage(Long userId, SendMessageRequest request) {
-        Message message = new Message();
-        message.setSenderId(userId);
-        message.setReceiverId(request.getReceiverId());
-        message.setContent(request.getContent());
-        message.setMessageType(request.getMessageType() != null ? request.getMessageType() : 1);
-        message.setConversationId(request.getConversationId());
-        message.setSendTime(LocalDateTime.now());
-        message.setSendStatus(1);
-        message.setIsAi(false); // 用户手动发送
-        message.setSequenceId(getNextSequenceId());
-
-        this.save(message);
-
-        // 推送给接收方
-        webSocketHandler.sendMessageToUser(request.getReceiverId(),
-                new WebSocketMessage("new_message", message));
-
-        return message;
     }
 
     @Override
@@ -62,41 +52,35 @@ public class MessageServiceImpl extends ServiceImpl<MessageMapper, Message> impl
 
     @Override
     public void markRead(Long userId, Long conversationId) {
+        // 标记已读逻辑已移动到 ChatServiceImpl
     }
 
+    @Transactional(rollbackFor = Exception.class)
     @Override
     public Message sendAgentMessage(Long senderId, Long receiverId, String content, String agentName) {
-        // 查找或创建会话 (Agent 消息通常属于用户与对方的会话)
-        LambdaQueryWrapper<org.linxin.server.module.chat.entity.Conversation> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(org.linxin.server.module.chat.entity.Conversation::getUserId, senderId)
-                .eq(org.linxin.server.module.chat.entity.Conversation::getPeerId, receiverId);
-        org.linxin.server.module.chat.entity.Conversation conversation = conversationMapper.selectOne(wrapper);
+        LocalDateTime now = LocalDateTime.now();
 
-        if (conversation == null) {
-            // 如果不存在，尝试查找群组会话
-            wrapper = new LambdaQueryWrapper<>();
-            wrapper.eq(org.linxin.server.module.chat.entity.Conversation::getUserId, senderId)
-                    .eq(org.linxin.server.module.chat.entity.Conversation::getGroupId, receiverId);
-            conversation = conversationMapper.selectOne(wrapper);
-        }
-
+        // 1. 保存消息（读扩散：conversationId = 0）
         Message message = new Message();
-        message.setConversationId(conversation != null ? conversation.getId() : 0L); // 如果找不到，暂时用 0L 兜底，但理想情况应已存在
+        message.setConversationId(0L);
         message.setSenderId(senderId);
         message.setReceiverId(receiverId);
         message.setContent(content);
         message.setMessageType(1);
-        message.setSendTime(LocalDateTime.now());
-        message.setSendStatus(1);
-        message.setIsAi(true); // AI 发送
-        message.setSenderType(agentName); // 存储 Agent 名称
+        message.setSendTime(now);
+        message.setSendStatus(SendStatus.SENT);
+        message.setIsAi(true);
+        message.setSenderType(agentName);
         message.setSequenceId(getNextSequenceId());
-
         this.save(message);
 
-        // 推送给双方
-        org.linxin.server.module.chat.vo.MessageVO vo = chatConverter.toVO(message);
-        org.linxin.server.module.user.entity.User sender = userMapper.selectById(senderId);
+        // 2. 更新双方会话状态（借用内部逻辑，不加未读数）
+        updateConversation(senderId, receiverId, message);
+        updateConversation(receiverId, senderId, message);
+
+        // 3. 推送给接收方
+        MessageVO vo = chatConverter.toVO(message);
+        User sender = userMapper.selectById(senderId);
         if (sender != null) {
             vo.setSenderNickname(sender.getNickname());
             vo.setSenderAvatar(sender.getAvatar());
@@ -104,9 +88,21 @@ public class MessageServiceImpl extends ServiceImpl<MessageMapper, Message> impl
         }
 
         WebSocketMessage wsMsg = new WebSocketMessage("new_message", vo);
-        webSocketHandler.sendMessageToUser(senderId, wsMsg);
         webSocketHandler.sendMessageToUser(receiverId, wsMsg);
 
         return message;
+    }
+
+    private void updateConversation(Long userId, Long peerId, Message message) {
+        LambdaQueryWrapper<Conversation> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Conversation::getUserId, userId).eq(Conversation::getPeerId, peerId);
+        Conversation conv = conversationMapper.selectOne(wrapper);
+        if (conv != null) {
+            conv.setLastMessageId(message.getId());
+            conv.setLastMessageContent(message.getContent());
+            conv.setLastMessageType(message.getMessageType());
+            conv.setLastMessageTime(message.getSendTime());
+            conversationMapper.updateById(conv);
+        }
     }
 }

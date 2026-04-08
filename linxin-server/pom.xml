@@ -216,7 +216,7 @@
             <removeUnusedImports />
             <importOrder />
             <eclipse>
-              <file>${project.basedir}/format/eclipse-formatter.xml</file>
+              <file>${project.basedir}/src/main/resources/eclipse-formatter.xml</file>
             </eclipse>
           </java>
         </configuration>

@@ -2,6 +2,8 @@ import 'package:dio/dio.dart';
 import 'package:meta/meta.dart';
 import 'package:lin_xin/config/api_config.dart';
 import 'package:lin_xin/core/service/log_service.dart';
+import 'package:lin_xin/modules/auth/auth_service.dart';
+import 'package:lin_xin/core/service/event_bus.dart';
 
 class HttpService {
   static HttpService _instance = HttpService._internal();
@@ -28,11 +30,11 @@ class HttpService {
         if (_token != null) {
           options.headers['Authorization'] = 'Bearer $_token';
         }
-        LogService.info('HTTP Request: [${options.method}] ${options.path}\nData: ${options.data}\nParams: ${options.queryParameters}');
+        LogService.debug('HTTP Request: [${options.method}] ${options.path}');
         return handler.next(options);
       },
       onResponse: (response, handler) {
-        LogService.info('HTTP Response: [${response.requestOptions.method}] ${response.requestOptions.path}\nStatus: ${response.statusCode}\nData: ${response.data}');
+        LogService.debug('HTTP Response: [${response.requestOptions.method}] ${response.requestOptions.path} Status: ${response.statusCode}');
 
         final dynamic respData = response.data;
         if (respData is Map<String, dynamic>) {
@@ -54,7 +56,14 @@ class HttpService {
         return handler.next(response);
       },
       onError: (e, handler) {
-        LogService.error('HTTP Error: [${e.requestOptions.method}] ${e.requestOptions.path}\nError: ${e.message}\nResponse: ${e.response?.data}', e);
+        if (e.response?.statusCode == 401) {
+          LogService.warn('Token expired, redirecting to login');
+          AuthService().logout();
+          EventBus.instance.emit(SessionExpiredEvent());
+          return handler.reject(e);
+        }
+
+        LogService.error('HTTP Error: [${e.requestOptions.method}] ${e.requestOptions.path} Status: ${e.response?.statusCode}', e);
 
         String message = '网络连接异常';
         if (e.type == DioExceptionType.connectionTimeout) {
@@ -103,17 +112,14 @@ class HttpService {
     int? connectTimeout,
     int? receiveTimeout,
   }) async {
-    final options = BaseOptions(
-      baseUrl: ApiConfig.baseUrl,
-      connectTimeout: connectTimeout != null ? Duration(milliseconds: connectTimeout) : const Duration(seconds: 10),
-      receiveTimeout: receiveTimeout != null ? Duration(milliseconds: receiveTimeout) : const Duration(seconds: 10),
-      contentType: 'application/json',
+    final response = await _dio.post(
+      path,
+      data: data,
+      options: Options(
+        sendTimeout: connectTimeout != null ? Duration(milliseconds: connectTimeout) : null,
+        receiveTimeout: receiveTimeout != null ? Duration(milliseconds: receiveTimeout) : null,
+      ),
     );
-    final dio = Dio(options);
-    if (_token != null) {
-      dio.options.headers['Authorization'] = 'Bearer $_token';
-    }
-    final response = await dio.post(path, data: data);
     return response.data;
   }
 

@@ -11,12 +11,15 @@ void main() async {
   await LogService().init();
   final authService = AuthService();
   await authService.initialize();
+
+  final dataService = DataService();
+  await dataService.initialize();
   
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: authService),
-        ChangeNotifierProvider(create: (_) => DataService()),
+        ChangeNotifierProvider.value(value: dataService),
       ],
       child: const MyApp(),
     ),

@@ -104,55 +104,28 @@ class Message {
   factory Message.fromJson(Map<String, dynamic> json) {
     return Message(
       id: json['id']?.toString() ?? '',
-      conversationId: json['conversationId']?.toString() ?? json['conversation_id']?.toString() ?? '',
-      senderId: json['senderId']?.toString() ?? json['sender_id']?.toString() ?? '',
-      senderNickname: json['senderNickname'] as String? ?? json['sender_nickname'] as String?,
-      senderAvatar: json['senderAvatar'] as String? ?? json['sender_avatar'] as String?,
+      conversationId: json['conversationId']?.toString() ?? '',
+      senderId: json['senderId']?.toString() ?? '',
+      senderNickname: json['senderNickname'] as String?,
+      senderAvatar: json['senderAvatar'] as String?,
       content: json['content'] as String? ?? '',
-      messageType: json['messageType'] as int? ?? json['message_type'] as int? ?? 1,
+      messageType: json['messageType'] as int? ?? 1,
       status: json['status'] as int? ?? 1,
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'] as String)
-          : json['created_at'] != null
-              ? DateTime.parse(json['created_at'] as String)
+      createdAt: json['sendTime'] != null
+          ? DateTime.parse(json['sendTime'] as String)
+          : json['createdAt'] != null
+              ? DateTime.parse(json['createdAt'] as String)
               : DateTime.now(),
-      isRead: json['isRead'] as bool? ?? json['is_read'] == 1,
-      isMe: json['isMe'] as bool? ?? json['is_me'] as bool? ?? false,
+      isRead: json['isRead'] as bool? ?? false,
+      isMe: json['isMe'] as bool? ?? false,
       time: json['time'] != null ? DateTime.parse(json['time'] as String) : null,
       groupId: json['groupId']?.toString(),
       conversationType: json['conversationType'] as int? ?? 0,
       sequenceId: json['sequenceId'] is String 
           ? int.tryParse(json['sequenceId'] as String) 
-          : (json['sequenceId'] as int? ?? json['sequence_id'] as int?),
-      senderType: json['senderType'] as String? ?? json['sender_type'] as String?,
-      isAi: json['isAi'] as bool? ?? json['is_ai'] as bool? ?? false,
-    );
-  }
-
-  factory Message.fromServerJson(Map<String, dynamic> json) {
-    return Message(
-      id: json['id']?.toString() ?? '',
-      conversationId: json['conversationId']?.toString() ?? json['conversation_id']?.toString() ?? '',
-      senderId: json['senderId']?.toString() ?? json['sender_id']?.toString() ?? '',
-      senderNickname: json['senderNickname'] as String? ?? json['sender_nickname'] as String?,
-      senderAvatar: json['senderAvatar'] as String? ?? json['sender_avatar'] as String?,
-      content: json['content'] as String? ?? '',
-      messageType: json['messageType'] as int? ?? json['message_type'] as int? ?? 1,
-      status: json['status'] as int? ?? 1,
-      createdAt: json['createdAt'] != null
-          ? DateTime.parse(json['createdAt'] as String)
-          : json['created_at'] != null
-              ? DateTime.parse(json['created_at'] as String)
-              : DateTime.now(),
-      isRead: json['isRead'] as bool? ?? json['is_read'] == 1,
-      isMe: json['isMe'] as bool? ?? json['is_me'] as bool? ?? false,
-      groupId: json['groupId']?.toString(),
-      conversationType: json['conversationType'] as int? ?? 0,
-      sequenceId: json['sequenceId'] is String 
-          ? int.tryParse(json['sequenceId'] as String) 
-          : (json['sequenceId'] as int? ?? json['sequence_id'] as int?),
-      senderType: json['senderType'] as String? ?? json['sender_type'] as String?,
-      isAi: json['isAi'] as bool? ?? json['is_ai'] as bool? ?? false,
+          : (json['sequenceId'] as int?),
+      senderType: json['senderType'] as String?,
+      isAi: json['isAi'] as bool? ?? false,
     );
   }
 }

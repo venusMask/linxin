@@ -99,14 +99,6 @@ public class ChatServiceImpl implements IChatService {
 
     @Override
     public Conversation getOrCreateConversation(Long userId, Long peerId) {
-        User aiUser = getSystemAIUser();
-        Long aiUserId = aiUser != null ? aiUser.getId() : null;
-
-        // AI 助手特殊处理 (基于数据库中实际的 AI 用户 ID)
-        if (aiUserId != null && peerId.equals(aiUserId)) {
-            return getOrCreateAIConversationInternal(userId);
-        }
-
         LambdaQueryWrapper<Conversation> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(Conversation::getUserId, userId).eq(Conversation::getPeerId, peerId);
         Conversation conversation = conversationMapper.selectOne(wrapper);
@@ -114,6 +106,10 @@ public class ChatServiceImpl implements IChatService {
         if (conversation == null) {
             User peer = userMapper.selectById(peerId);
             if (peer == null) {
+                User aiUser = getSystemAIUser();
+                if (aiUser != null && peerId.equals(aiUser.getId())) {
+                    throw new org.linxin.server.common.exception.BusinessException("系统 AI 助手尚未配置，请联系管理员");
+                }
                 throw new org.linxin.server.common.exception.BusinessException("用户不存在");
             }
             conversation = new Conversation();
@@ -131,36 +127,14 @@ public class ChatServiceImpl implements IChatService {
 
     @Override
     public ConversationVO getOrCreateAIConversation(Long userId) {
-        Conversation conversation = getOrCreateAIConversationInternal(userId);
-        ConversationVO vo = chatConverter.toVO(conversation);
-        vo.setUserType(1);
-        return vo;
-    }
-
-    private Conversation getOrCreateAIConversationInternal(Long userId) {
         User aiUser = getSystemAIUser();
         if (aiUser == null) {
             throw new org.linxin.server.common.exception.BusinessException("系统 AI 助手尚未配置，请联系管理员");
         }
-        Long aiUserId = aiUser.getId();
-
-        LambdaQueryWrapper<Conversation> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Conversation::getUserId, userId).eq(Conversation::getPeerId, aiUserId);
-        Conversation conversation = conversationMapper.selectOne(wrapper);
-
-        if (conversation == null) {
-            conversation = new Conversation();
-            conversation.setUserId(userId);
-            conversation.setPeerId(aiUserId);
-            conversation.setPeerNickname(aiUser.getNickname());
-            conversation.setPeerAvatar(aiUser.getAvatar());
-            conversation.setUnreadCount(0);
-            conversation.setTopStatus(0);
-            conversation.setMuteStatus(0);
-            conversationMapper.insert(conversation);
-        }
-
-        return conversation;
+        Conversation conversation = getOrCreateConversation(userId, aiUser.getId());
+        ConversationVO vo = chatConverter.toVO(conversation);
+        vo.setUserType(1);
+        return vo;
     }
 
     /**
@@ -196,26 +170,34 @@ public class ChatServiceImpl implements IChatService {
         Conversation receiverConversation = getOrCreateConversation(request.getReceiverId(), senderId);
 
         LocalDateTime sendTime = LocalDateTime.now();
-        Message message = createMessageEntity(senderConversation.getId(), senderId, request.getReceiverId(), request,
-                sendTime);
+        // 读扩散优化：私聊也只插入一条消息，conversationId 设为 0L
+        Message message = new Message();
+        message.setConversationId(0L);
+        message.setSenderId(senderId);
+        message.setReceiverId(request.getReceiverId());
+        message.setMessageType(request.getMessageType());
+        message.setContent(request.getContent());
+        message.setExtra(request.getExtra());
+        message.setSendStatus(SendStatus.SENT);
+        message.setSendTime(sendTime);
+        message.setIsAi(false);
+        message.setSequenceId(messageService.getNextSequenceId());
         messageMapper.insert(message);
 
-        Message receiverMessage = createMessageEntity(receiverConversation.getId(), senderId, request.getReceiverId(),
-                request, sendTime);
-        messageMapper.insert(receiverMessage);
-
         updateSenderConversation(senderConversation, message, senderId);
-        updateReceiverConversation(receiverConversation, receiverMessage, senderId);
+        updateReceiverConversation(receiverConversation, message, senderId);
         // 移除已失效的消息状态保存逻辑
 
         // 推送给接收方
-        MessageVO messageVO = chatConverter.toVO(receiverMessage);
+        MessageVO messageVO = chatConverter.toVO(message);
         User sender = userMapper.selectById(senderId);
         if (sender != null) {
             messageVO.setSenderNickname(sender.getNickname());
             messageVO.setSenderAvatar(sender.getAvatar());
             messageVO.setUserType(sender.getUserType());
         }
+        log.info("[Trace] Single Chat: sender {} -> receiver {}, messageId={}, sequenceId={}", senderId,
+                request.getReceiverId(), message.getId(), message.getSequenceId());
         webSocketHandler.sendMessageToUser(request.getReceiverId(), new WebSocketMessage("new_message", messageVO));
         return message;
     }
@@ -239,9 +221,11 @@ public class ChatServiceImpl implements IChatService {
         Conversation conversation = getOrCreateConversation(userId, aiUserId);
         LocalDateTime now = LocalDateTime.now();
 
-        // 0. 加载历史上下文（最近 10 条）
+        // 0. 加载历史上下文（最近 10 条） - 读扩散模式下按发送者/接收者查询
         LambdaQueryWrapper<Message> historyWrapper = new LambdaQueryWrapper<>();
-        historyWrapper.eq(Message::getConversationId, conversation.getId())
+        historyWrapper.and(w -> w.and(sw -> sw.eq(Message::getSenderId, userId).eq(Message::getReceiverId, aiUserId))
+                .or(sw -> sw.eq(Message::getSenderId, aiUserId).eq(Message::getReceiverId, userId)))
+                .isNull(Message::getGroupId)
                 .orderByDesc(Message::getSendTime)
                 .last("LIMIT 10");
         List<Message> history = messageMapper.selectList(historyWrapper);
@@ -257,7 +241,7 @@ public class ChatServiceImpl implements IChatService {
 
         // 1. 保存用户的消息
         Message userMsg = new Message();
-        userMsg.setConversationId(conversation.getId());
+        userMsg.setConversationId(0L); // 读扩散
         userMsg.setSenderId(userId);
         userMsg.setReceiverId(aiUserId);
         userMsg.setContent(request.getContent());
@@ -285,7 +269,7 @@ public class ChatServiceImpl implements IChatService {
                 // 3. 处理 AI 的回复文本并推送
                 if (response.getReply() != null && !response.getReply().isBlank()) {
                     Message aiReply = new Message();
-                    aiReply.setConversationId(conversationId);
+                    aiReply.setConversationId(0L); // 读扩散
                     aiReply.setSenderId(aiUserId);
                     aiReply.setReceiverId(userId);
                     aiReply.setContent(response.getReply());
@@ -339,27 +323,26 @@ public class ChatServiceImpl implements IChatService {
         return userMsg;
     }
 
-    private Message createMessageEntity(Long convId, Long senderId, Long receiverId, SendMessageRequest request,
-            LocalDateTime time) {
-        Message m = new Message();
-        m.setConversationId(convId);
-        m.setSenderId(senderId);
-        m.setReceiverId(receiverId);
-        m.setMessageType(request.getMessageType());
-        m.setContent(request.getContent());
-        m.setExtra(request.getExtra());
-        m.setSendStatus(SendStatus.SENT);
-        m.setSendTime(time);
-        m.setIsAi(false);
-        m.setSequenceId(messageService.getNextSequenceId());
-        return m;
-    }
-
     @Override
     public IPage<MessageVO> getMessageList(Long conversationId, Integer pageNum, Integer pageSize) {
+        Conversation conversation = conversationMapper.selectById(conversationId);
+        if (conversation == null) {
+            return new Page<>(pageNum, pageSize, 0);
+        }
+
         Page<Message> page = new Page<>(pageNum, pageSize);
         LambdaQueryWrapper<Message> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Message::getConversationId, conversationId).orderByDesc(Message::getSendTime);
+        if (conversation.getGroupId() != null && conversation.getGroupId() > 0) {
+            wrapper.eq(Message::getGroupId, conversation.getGroupId());
+        } else {
+            // 私聊读扩散查询
+            Long u1 = conversation.getUserId();
+            Long u2 = conversation.getPeerId();
+            wrapper.and(w -> w.and(sw -> sw.eq(Message::getSenderId, u1).eq(Message::getReceiverId, u2))
+                    .or(sw -> sw.eq(Message::getSenderId, u2).eq(Message::getReceiverId, u1)))
+                    .isNull(Message::getGroupId);
+        }
+        wrapper.orderByDesc(Message::getSendTime);
         IPage<Message> messagePage = messageMapper.selectPage(page, wrapper);
 
         if (messagePage.getRecords().isEmpty()) {
@@ -396,11 +379,12 @@ public class ChatServiceImpl implements IChatService {
     public IPage<MessageVO> getMessagesBetweenUsers(Long userId, Long peerId, Integer pageNum, Integer pageSize) {
         Page<Message> pageParam = new Page<>(pageNum, pageSize, 100);
 
-        Conversation conversation = getOrCreateConversation(userId, peerId);
-
         LambdaQueryWrapper<Message> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(Message::getConversationId, conversation.getId())
-                .eq(Message::getDeleted, 0).orderByDesc(Message::getSendTime);
+        wrapper.and(w -> w.and(sw -> sw.eq(Message::getSenderId, userId).eq(Message::getReceiverId, peerId))
+                .or(sw -> sw.eq(Message::getSenderId, peerId).eq(Message::getReceiverId, userId)))
+                .isNull(Message::getGroupId)
+                .eq(Message::getDeleted, 0)
+                .orderByDesc(Message::getSendTime);
         Page<Message> messagePage = messageMapper.selectPage(pageParam, wrapper);
         return messagePage.convert(message -> {
             MessageVO vo = chatConverter.toVO(message);
@@ -605,10 +589,6 @@ public class ChatServiceImpl implements IChatService {
             lastSequenceId = 0L;
         }
 
-        List<Long> conversationIds = conversationMapper.selectList(
-                new LambdaQueryWrapper<Conversation>().eq(Conversation::getUserId, userId)).stream()
-                .map(Conversation::getId).collect(Collectors.toList());
-
         List<Long> groupIds = groupMemberMapper
                 .selectList(new LambdaQueryWrapper<GroupMember>().eq(GroupMember::getUserId, userId)
                         .eq(GroupMember::getDeleted, 0))
@@ -617,13 +597,12 @@ public class ChatServiceImpl implements IChatService {
         LambdaQueryWrapper<Message> wrapper = new LambdaQueryWrapper<>();
         wrapper.gt(Message::getSequenceId, lastSequenceId)
                 .and(w -> {
-                    if (!conversationIds.isEmpty()) {
-                        w.in(Message::getConversationId, conversationIds);
-                    } else {
-                        w.eq(Message::getConversationId, -1L);
-                    }
+                    // 私聊（读扩散）：发送者或接收者是自己，且 groupId 为空
+                    w.and(pw -> pw.isNull(Message::getGroupId)
+                            .and(sw -> sw.eq(Message::getSenderId, userId).or().eq(Message::getReceiverId, userId)));
+                    // 群聊（读扩散）：属于已加入的群组
                     if (!groupIds.isEmpty()) {
-                        w.or().in(Message::getGroupId, groupIds);
+                        w.or(gw -> gw.in(Message::getGroupId, groupIds));
                     }
                 })
                 .orderByAsc(Message::getSequenceId)

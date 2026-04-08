@@ -5,7 +5,6 @@ import 'package:lin_xin/modules/chat/message.dart';
 import 'package:lin_xin/modules/auth/user.dart';
 import 'package:lin_xin/modules/contact/group.dart';
 import 'package:lin_xin/core/service/http_service.dart';
-import 'package:lin_xin/core/service/websocket_service.dart';
 import 'package:lin_xin/core/service/db_service.dart';
 import 'package:lin_xin/modules/chat/message_local_service.dart';
 import 'package:lin_xin/modules/auth/auth_service.dart';
@@ -34,7 +33,6 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
   late final MessageLocalService _messageLocalService;
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final WebSocketService _webSocketService = WebSocketService();
   final EventBus _eventBus = EventBus.instance;
 
   late final Future<List<Message>> _messagesFuture;
@@ -226,21 +224,6 @@ class _ChatDetailPageState extends State<ChatDetailPage> {
             }
           });
         }
-
-        if (_isGroupChat) {
-          _webSocketService.sendGroupMessage(
-            groupId: widget.chat.group?.id ?? '',
-            content: text,
-            messageType: 1,
-          );
-        } else {
-          _webSocketService.sendMessage(
-            content: text,
-            conversationId: _chatId,
-            messageType: 1,
-          );
-        }
-
       } catch (e) {
         debugPrint('发送消息失败: $e');
 

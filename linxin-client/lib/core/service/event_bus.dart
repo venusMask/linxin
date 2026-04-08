@@ -88,3 +88,5 @@ class ConversationUpdatedEvent extends Event {
     this.lastMessageTime,
   });
 }
+
+class SessionExpiredEvent extends Event {}
